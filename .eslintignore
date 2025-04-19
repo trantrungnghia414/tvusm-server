@@ -1,0 +1,1 @@
+echo "webpack-hmr.config.js" >> .eslintignore
