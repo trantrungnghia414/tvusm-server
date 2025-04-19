@@ -27,6 +27,7 @@ Update ESLint rules to convert warnings to errors:
 
 ```javascript
 rules: {
+  '@typescript-eslint/no-floating-promises': 'error'
   '@typescript-eslint/no-unsafe-argument': 'error',
 }
 ```
@@ -71,12 +72,25 @@ module.exports = function (options, webpack) {
 };
 ```
 
+> **Note**: To fix the "not found" error from ESLint, add `webpack-hmr.config.js` to the `ignores` list in `eslint.config.mjs`:
+
+```javascript
+export default tseslint.config({
+  ignores: ['eslint.config.mjs', 'webpack-hmr.config.js'], // Add webpack-hmr.config.js here
+});
+```
+
 ### 3. Update main.ts
 
 Add the following code to your `main.ts`:
 
 ```typescript
-declare const module: any;
+declare const module: NodeModule & {
+  hot?: {
+    accept: () => void;
+    dispose: (callback: () => void) => void;
+  };
+};
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
@@ -87,10 +101,12 @@ async function bootstrap() {
 
   if (module.hot) {
     module.hot.accept();
-    module.hot.dispose(() => app.close());
+    module.hot.dispose(() => void app.close());
   }
 }
-bootstrap();
+bootstrap().catch((err) => {
+  console.error('Error starting the application:', err);
+});
 ```
 
 ### 4. Update package.json
