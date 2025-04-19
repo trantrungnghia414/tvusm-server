@@ -1,75 +1,106 @@
-Tạo project NestSJ
+# NestJS Project Setup Guide
 
+## Initial Setup
+
+Create a new NestJS project:
+
+```bash
 npm i -g @nestjs/cli
 nest new project-name
+```
 
----
+## ESLint Configuration
 
-Thêm prettier để hết lỗi CRLF trong eslint
+### Fix CRLF Issues with Prettier
+
+Add the following rule to your ESLint config:
+
+```javascript
 rules: {
-'prettier/prettier': ['error', { endOfLine: 'auto' }],
-},
+  'prettier/prettier': ['error', { endOfLine: 'auto' }],
+}
+```
 
----
+### Change Warnings to Errors
 
-Đổi warn thành error để hết báo đỏ cảnh báo trong eslint
+Update ESLint rules to convert warnings to errors:
+
+```javascript
 rules: {
-'@typescript-eslint/no-unsafe-argument': 'error',
-},
+  '@typescript-eslint/no-unsafe-argument': 'error',
+}
+```
 
----
+## Hot Reload Configuration
 
-Cài Hot Reload
+### 1. Install Required Packages
 
+```bash
 npm i --save-dev webpack-node-externals run-script-webpack-plugin webpack
+```
 
-Tạo webpack-hmr.config.js ở thư mục root và sửa chổ autoRestart: thành true
+### 2. Create Webpack HMR Configuration
 
+Create `webpack-hmr.config.js` in the root directory:
+
+```javascript
 const nodeExternals = require('webpack-node-externals');
 const { RunScriptWebpackPlugin } = require('run-script-webpack-plugin');
 
 module.exports = function (options, webpack) {
-return {
-...options,
-entry: ['webpack/hot/poll?100', options.entry],
-externals: [
-nodeExternals({
-allowlist: ['webpack/hot/poll?100'],
-}),
-],
-plugins: [
-...options.plugins,
-new webpack.HotModuleReplacementPlugin(),
-new webpack.WatchIgnorePlugin({
-paths: [/\.js$/, /\.d\.ts$/],
-}),
-new RunScriptWebpackPlugin({ name: options.output.filename, autoRestart: true }),
-],
+  return {
+    ...options,
+    entry: ['webpack/hot/poll?100', options.entry],
+    externals: [
+      nodeExternals({
+        allowlist: ['webpack/hot/poll?100'],
+      }),
+    ],
+    plugins: [
+      ...options.plugins,
+      new webpack.HotModuleReplacementPlugin(),
+      new webpack.WatchIgnorePlugin({
+        paths: [/\.js$/, /\.d\.ts$/],
+      }),
+      new RunScriptWebpackPlugin({
+        name: options.output.filename,
+        autoRestart: true,
+      }),
+    ],
+  };
 };
-};
+```
 
-Và thêm vào main.ts
+### 3. Update main.ts
 
+Add the following code to your `main.ts`:
+
+```typescript
 declare const module: any;
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-const app = await NestFactory.create(AppModule);
-await app.listen(process.env.PORT ?? 3000);
+  const app = await NestFactory.create(AppModule);
+  await app.listen(process.env.PORT ?? 3000);
 
-if (module.hot) {
-module.hot.accept();
-module.hot.dispose(() => app.close());
-}
+  if (module.hot) {
+    module.hot.accept();
+    module.hot.dispose(() => app.close());
+  }
 }
 bootstrap();
+```
 
----
+### 4. Update package.json
 
-Trong package.json
+Add the following script to your package.json:
 
-"start:dev": "nest build --webpack --webpackPath webpack-hmr.config.js --watch"
-
----
+```json
+{
+  "scripts": {
+    "start:dev": "nest build --webpack --webpackPath webpack-hmr.config.js --watch"
+  }
+}
+```
