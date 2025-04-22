@@ -15,13 +15,36 @@ export class UserService {
   ) {} // Hang này sẽ tự động tạo một instance của User repository và gán nó vào biến userRepo.
 
   async create(createUserDto: CreateUserDto) {
-    const salt = bcrypt.genSaltSync(); // Tạo một salt mới để mã hoá mật khẩu
-    const hashPassword = await bcrypt.hash(createUserDto.password, salt); // Mã hoá mật khẩu mới với salt đã tạo
+    const existingUser = await this.userRepo.findOne({
+      where: [
+        { email: createUserDto.email },
+        { username: createUserDto.username },
+      ],
+    });
+    // Kiểm tra xem email hoặc username đã tồn tại chưa
+    if (existingUser && existingUser.email === createUserDto.email) {
+      throw new NotFoundException(
+        `Email ${createUserDto.email} already exists`,
+      );
+    }
+    if (existingUser && existingUser.username === createUserDto.username) {
+      throw new NotFoundException(
+        `Username ${createUserDto.username} already exists`,
+      );
+    }
+
+    // Tạo một salt mới để mã hoá mật khẩu
+    const salt = bcrypt.genSaltSync();
+    // Mã hoá mật khẩu mới với salt đã tạo
+    const hashPassword = await bcrypt.hash(createUserDto.password, salt);
 
     const newUser = this.userRepo.create({
       ...createUserDto,
       password: hashPassword,
+      role: 'customer', // Mặc định là customer
+      created_at: new Date(), // Ngày tạo tài khoản
     });
+    // Lưu người dùng mới vào cơ sở dữ liệu
     return this.userRepo.save(newUser);
   }
 
@@ -87,6 +110,6 @@ export class UserService {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) throw new NotFoundException(`Invalid password`);
-    // return this.authService.generateToken(user);
+    return this.authService.generateToken(user);
   }
 }

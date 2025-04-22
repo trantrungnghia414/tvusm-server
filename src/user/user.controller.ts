@@ -33,7 +33,7 @@ export class UserController {
     return req.user; // trả về thông tin người dùng đã xác thực
   }
 
-  @Post()
+  @Post('register')
   create(@Body() createUserDto: CreateUserDto) {
     return this.userService.create(createUserDto);
   }

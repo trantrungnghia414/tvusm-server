@@ -1,3 +1,7 @@
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+
 declare const module: NodeModule & {
   hot?: {
     accept: () => void;
@@ -20,6 +24,3 @@ async function bootstrap() {
 bootstrap().catch((err) => {
   console.error('Error starting the application:', err);
 });
-
-import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env' });
