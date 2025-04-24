@@ -7,7 +7,11 @@ export class AuthService {
   constructor(private jwtService: JwtService) {}
 
   generateToken(user: User): string {
-    const payload = { username: user.username, user_id: user.user_id };
+    const payload = {
+      username: user.username,
+      user_id: user.user_id,
+      role: user.role,
+    };
     return this.jwtService.sign(payload);
   }
 }

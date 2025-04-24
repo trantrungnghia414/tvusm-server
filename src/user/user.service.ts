@@ -110,6 +110,7 @@ export class UserService {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) throw new NotFoundException(`Invalid password`);
+
     return this.authService.generateToken(user);
   }
 }
