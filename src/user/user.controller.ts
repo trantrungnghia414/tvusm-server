@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -36,6 +37,21 @@ export class UserController {
   @Post('register')
   create(@Body() createUserDto: CreateUserDto) {
     return this.userService.create(createUserDto);
+  }
+
+  @Get('verify-email')
+  async verifyEmail(@Query('token') token: string) {
+    return this.userService.verifyEmail(token);
+  }
+
+  @Post('verify-code')
+  async verifyCode(@Body() body: { email: string; code: string }) {
+    return this.userService.verifyCode(body.email, body.code);
+  }
+
+  @Post('resend-code')
+  async resendVerificationCode(@Body() body: { email: string }) {
+    return this.userService.resendVerificationCode(body.email);
   }
 
   @Get()

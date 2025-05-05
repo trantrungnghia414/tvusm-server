@@ -20,7 +20,7 @@ export class User {
   @Column({ nullable: true })
   fullname: string;
 
-  @Column({ nullable: true })
+  @Column({ unique: true })
   email: string;
 
   @Column({ nullable: true })
@@ -32,6 +32,21 @@ export class User {
     default: 'customer',
   })
   role: string;
+
+  @Column({ default: false })
+  is_verified: boolean;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  verification_token: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  reset_password_token: string | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  reset_password_expires: Date | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  verification_expires: Date | null;
 
   @CreateDateColumn()
   created_at: Date;
