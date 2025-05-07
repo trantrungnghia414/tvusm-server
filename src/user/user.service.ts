@@ -32,13 +32,11 @@ export class UserService {
     });
     // Kiểm tra xem email hoặc username đã tồn tại chưa
     if (existingUser && existingUser.email === createUserDto.email) {
-      throw new NotFoundException(
-        `Email ${createUserDto.email} already exists`,
-      );
+      throw new NotFoundException(`Email ${createUserDto.email} đã tồn tại`);
     }
     if (existingUser && existingUser.username === createUserDto.username) {
       throw new NotFoundException(
-        `Username ${createUserDto.username} already exists`,
+        `Tên đăng nhập ${createUserDto.username} đã tồn tại`,
       );
     }
 
