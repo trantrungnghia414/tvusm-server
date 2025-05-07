@@ -14,6 +14,7 @@ import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { GoogleAuthDto } from 'src/user/dto/google-auth.dto';
 
 interface RequestWithUser extends Request {
   user: {
@@ -77,5 +78,22 @@ export class UserController {
   @Post('login')
   login(@Body() body: { login: string; password: string }) {
     return this.userService.login(body.login, body.password);
+  }
+
+  @Post('forgot-password')
+  async forgotPassword(@Body() body: { email: string }) {
+    return this.userService.forgotPassword(body.email);
+  }
+
+  @Post('reset-password')
+  async resetPassword(
+    @Body() body: { email: string; code: string; password: string },
+  ) {
+    return this.userService.resetPassword(body.email, body.code, body.password);
+  }
+
+  @Post('google-auth')
+  async googleAuth(@Body() googleAuthDto: GoogleAuthDto) {
+    return this.userService.googleAuth(googleAuthDto);
   }
 }

@@ -1,3 +1,8 @@
+# RUN
+
+npm run start:dev
+npm run start:dev -- --host 0.0.0.0
+
 # NestJS Project Setup Guide
 
 ## Initial Setup

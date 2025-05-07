@@ -40,20 +40,18 @@ export class MailService {
 
   // Gửi email đặt lại mật khẩu
   // Sử dụng async/await để xử lý bất đồng bộ
-  async sendResetPasswordEmail(email: string, token: string) {
-    const resetUrl = `http://localhost:3001/reset-password?token=${token}`;
-
+  async sendResetPasswordCode(email: string, code: string) {
     await this.transporter.sendMail({
       from: '"TVU Sports Center" <noreply@tvu.edu.vn>',
       to: email,
-      subject: 'Đặt lại mật khẩu',
+      subject: 'Mã đặt lại mật khẩu',
       html: `
-        <h2>Đặt lại mật khẩu</h2>
-        <p>Bạn đã yêu cầu đặt lại mật khẩu. Click vào link bên dưới để tiếp tục:</p>
-        <a href="${resetUrl}">Đặt lại mật khẩu</a>
-        <p>Link này sẽ hết hạn sau 1 giờ.</p>
-        <p>Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
-      `,
+      <h2>Đặt lại mật khẩu</h2>
+      <p>Bạn đã yêu cầu đặt lại mật khẩu. Sử dụng mã bên dưới để tiếp tục:</p>
+      <h1 style="color: #2563eb; font-size: 32px; letter-spacing: 4px;">${code}</h1>
+      <p>Mã này sẽ hết hạn sau 15 phút.</p>
+      <p>Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
+    `,
     });
   }
 }

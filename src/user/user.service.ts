@@ -12,7 +12,7 @@ import { User } from 'src/user/entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from 'src/auth/auth.service';
 import { MailService } from '../mail/mail.service';
-import * as crypto from 'crypto';
+import { GoogleAuthDto } from 'src/user/dto/google-auth.dto';
 
 @Injectable()
 export class UserService {
@@ -234,33 +234,41 @@ export class UserService {
   async forgotPassword(email: string) {
     const user = await this.userRepo.findOne({ where: { email } });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Không tìm thấy người dùng với email này');
     }
 
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = new Date();
-    resetTokenExpiry.setHours(resetTokenExpiry.getHours() + 1);
+    // Tạo mã xác thực 6 chữ số giống như verification code
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const resetExpires = new Date();
+    resetExpires.setMinutes(resetExpires.getMinutes() + 15); // Hết hạn sau 15 phút
 
-    user.reset_password_token = resetToken;
-    user.reset_password_expires = resetTokenExpiry;
+    user.reset_password_token = resetCode;
+    user.reset_password_expires = resetExpires;
     await this.userRepo.save(user);
 
-    // await this.mailService.sendResetPasswordEmail(email, resetToken);
+    // Gửi mã qua email thay vì link
+    await this.mailService.sendResetPasswordCode(user.email, resetCode);
 
-    return { message: 'Password reset email sent' };
+    return {
+      message: 'Mã đặt lại mật khẩu đã được gửi đến email của bạn',
+      email: user.email,
+    };
   }
 
   // ============== RESET PASSWORD ==================
-  async resetPassword(token: string, newPassword: string) {
+  async resetPassword(email: string, code: string, newPassword: string) {
     const user = await this.userRepo.findOne({
       where: {
-        reset_password_token: token,
+        email,
+        reset_password_token: code,
         reset_password_expires: MoreThan(new Date()),
       },
     });
 
     if (!user) {
-      throw new NotFoundException('Invalid or expired reset token');
+      throw new NotFoundException(
+        'Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn',
+      );
     }
 
     const salt = bcrypt.genSaltSync();
@@ -271,6 +279,90 @@ export class UserService {
     user.reset_password_expires = null;
     await this.userRepo.save(user);
 
-    return { message: 'Password reset successfully' };
+    return { message: 'Đặt lại mật khẩu thành công' };
+  }
+
+  // ============== GOOGLE AUTH ==================
+  async googleAuth(googleAuthDto: GoogleAuthDto) {
+    const { email, name, picture, googleId } = googleAuthDto;
+
+    // Kiểm tra xem người dùng đã tồn tại chưa (bằng email hoặc google_id)
+    let user = await this.userRepo.findOne({
+      where: [{ email }, { google_id: googleId }],
+    });
+
+    if (!user) {
+      // TH1: Người dùng chưa tồn tại - Tạo tài khoản mới
+      console.log('Creating new user for Google login');
+
+      // Tạo username từ email (gmail.com -> username)
+      const emailUsername = email.split('@')[0];
+      // Loại bỏ ký tự đặc biệt, để lại chữ cái, số và _
+      let username = emailUsername.replace(/[^a-zA-Z0-9_]/g, '_');
+
+      // Kiểm tra xem username đã tồn tại chưa
+      const existingUsername = await this.userRepo.findOne({
+        where: { username },
+      });
+      if (existingUsername) {
+        // Nếu username đã tồn tại, thêm số ngẫu nhiên vào cuối
+        username = `${username}_${Math.floor(Math.random() * 1000)}`;
+      }
+
+      // Tạo mật khẩu ngẫu nhiên an toàn
+      const randomPassword =
+        Math.random().toString(36).slice(-10) +
+        Math.random().toString(36).slice(-10).toUpperCase() +
+        Math.random().toString(36).slice(-2);
+
+      // Mã hóa mật khẩu
+      const salt = bcrypt.genSaltSync();
+      const hashPassword = await bcrypt.hash(randomPassword, salt);
+
+      // Tạo người dùng mới
+      user = this.userRepo.create({
+        email,
+        username,
+        password: hashPassword,
+        google_id: googleId,
+        is_verified: true, // Tài khoản Google đã được xác thực
+        name: name || username,
+        avatar: picture,
+        role: 'customer', // Mặc định là khách hàng
+        created_at: new Date(),
+      });
+
+      await this.userRepo.save(user);
+      console.log('New user created:', user.username);
+    } else if (!user.google_id) {
+      // TH2: Người dùng đã tồn tại nhưng chưa liên kết với Google
+      console.log('Linking existing user to Google account');
+
+      // Cập nhật thông tin Google
+      user.google_id = googleId;
+      user.is_verified = true; // Tự động xác thực tài khoản
+      if (picture && !user.avatar) user.avatar = picture;
+      if (name && !user.name) user.name = name;
+
+      await this.userRepo.save(user);
+      console.log('User linked to Google:', user.username);
+    } else {
+      // TH3: Người dùng đã tồn tại và đã liên kết với Google
+      console.log('Existing Google user logging in:', user.username);
+    }
+
+    // Tạo JWT token
+    const token = this.authService.generateToken(user);
+
+    // Trả về thông tin đăng nhập
+    return {
+      access_token: token,
+      id: user.user_id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      name: user.name,
+    };
   }
 }

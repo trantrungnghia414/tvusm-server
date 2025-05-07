@@ -51,6 +51,16 @@ export class User {
   @CreateDateColumn()
   created_at: Date;
 
+  // Thêm các trường mới
+  @Column({ nullable: true, name: 'google_id' })
+  google_id: string;
+
+  @Column({ nullable: true })
+  avatar: string;
+
+  @Column({ nullable: true })
+  name: string;
+
   // @OneToMany(() => Booking, (booking) => booking.user)
   // bookings: Booking[];
 
