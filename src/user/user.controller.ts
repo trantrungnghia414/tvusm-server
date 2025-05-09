@@ -10,6 +10,10 @@ import {
   Request,
   Query,
   ParseIntPipe,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -17,6 +21,10 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { GoogleAuthDto } from 'src/user/dto/google-auth.dto';
 import { ChangePasswordDto } from 'src/user/dto/change-password.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import * as fs from 'fs';
 
 interface RequestWithUser extends Request {
   user: {
@@ -68,7 +76,71 @@ export class UserController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: number, @Body() updateUserDto: UpdateUserDto) {
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      storage: diskStorage({
+        destination: './uploads/avatars',
+        filename: (req, file, cb) => {
+          const userId = req.params.id;
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const ext = extname(file.originalname);
+          cb(null, `user-${userId}-${uniqueSuffix}${ext}`);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+          return cb(
+            new BadRequestException(
+              'Chỉ chấp nhận file ảnh: jpg, jpeg, png, gif',
+            ),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+      limits: {
+        fileSize: 2 * 1024 * 1024, // 2MB
+      },
+    }),
+  )
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateUserDto: UpdateUserDto,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: RequestWithUser,
+  ) {
+    // Kiểm tra quyền truy cập
+    if (req.user.user_id !== id && req.user.role !== 'admin') {
+      throw new UnauthorizedException(
+        'Bạn không có quyền cập nhật thông tin cho người dùng khác',
+      );
+    }
+
+    // Nếu có file ảnh mới được tải lên
+    if (file) {
+      // Tìm user hiện tại để kiểm tra avatar cũ
+      const currentUser = await this.userService.findOne(id);
+
+      // Xóa avatar cũ nếu có và không phải là ảnh mặc định
+      if (
+        currentUser?.avatar &&
+        !currentUser.avatar.includes('default') &&
+        fs.existsSync(`.${currentUser.avatar}`)
+      ) {
+        try {
+          fs.unlinkSync(`.${currentUser.avatar}`);
+        } catch (error) {
+          console.error('Error deleting old avatar:', error);
+        }
+      }
+
+      // Thêm đường dẫn ảnh mới vào dữ liệu cập nhật
+      const avatarUrl = `/uploads/avatars/${file.filename}`;
+      updateUserDto.avatar = avatarUrl;
+    }
+
     return this.userService.update(id, updateUserDto);
   }
 

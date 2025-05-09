@@ -9,6 +9,7 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   phone?: string; // Số điện thoại
   address?: string; // Địa chỉ
   role?: string; // Vai trò của người dùng (admin, user, v.v.)
+  avatar?: string; // Đường dẫn đến ảnh đại diện
   created_at?: Date; // Ngày tạo tài khoản
 
   currentPassword?: string; // Mật khẩu hiện tại (nếu cần xác thực trước khi thay đổi mật khẩu mới)
