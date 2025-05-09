@@ -9,12 +9,14 @@ import {
   UseGuards,
   Request,
   Query,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { GoogleAuthDto } from 'src/user/dto/google-auth.dto';
+import { ChangePasswordDto } from 'src/user/dto/change-password.dto';
 
 interface RequestWithUser extends Request {
   user: {
@@ -30,9 +32,9 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get('profile')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard) //JwtAuthGuard có tác dụng bảo vệ route này chỉ cho phép người dùng đã xác thực truy cập
   getProfile(@Request() req: RequestWithUser) {
-    return req.user; // trả về thông tin người dùng đã xác thực
+    return this.userService.getFullProfile(req.user.user_id); // trả về thông tin người dùng đã xác thực
   }
 
   @Post('register')
@@ -95,5 +97,18 @@ export class UserController {
   @Post('google-auth')
   async googleAuth(@Body() googleAuthDto: GoogleAuthDto) {
     return this.userService.googleAuth(googleAuthDto);
+  }
+
+  @Post(':id/change-password')
+  @UseGuards(JwtAuthGuard)
+  async changePassword(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    return this.userService.changePassword(
+      id,
+      changePasswordDto.currentPassword,
+      changePasswordDto.newPassword,
+    );
   }
 }

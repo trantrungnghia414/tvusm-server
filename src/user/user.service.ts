@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   Injectable,
   NotFoundException,
@@ -219,9 +220,11 @@ export class UserService {
 
       await this.mailService.sendVerificationCode(user.email, verificationCode);
 
-      throw new UnauthorizedException(
-        'Please verify your email first. A new verification code has been sent.',
-      );
+      throw new UnauthorizedException({
+        message:
+          'Please verify your email first. A new verification code has been sent.',
+        email: user.email,
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -364,5 +367,60 @@ export class UserService {
       avatar: user.avatar,
       name: user.name,
     };
+  }
+
+  // Lấy thông tin người dùng từ token
+  async getFullProfile(userId: number) {
+    const user = await this.userRepo.findOne({
+      where: { user_id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // Loại bỏ trường password và các thông tin nhạy cảm khác trước khi trả về
+    const {
+      password,
+      verification_token,
+      verification_expires,
+      reset_password_token,
+      reset_password_expires,
+      ...userInfo
+    } = user;
+
+    return userInfo;
+  }
+
+  // ============== CHANGE PASSWORD ==================
+  async changePassword(
+    userId: number,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.findOne(userId);
+    if (!user) {
+      throw new NotFoundException(`Không tìm thấy người dùng với ID ${userId}`);
+    }
+
+    // Xác thực mật khẩu hiện tại
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.password,
+    );
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Mật khẩu hiện tại không đúng');
+    }
+
+    // Mã hoá mật khẩu mới
+    const salt = bcrypt.genSaltSync();
+    const hashPassword = await bcrypt.hash(newPassword, salt);
+
+    // Cập nhật mật khẩu mới
+    user.password = hashPassword;
+    await this.userRepo.save(user);
+
+    return { message: 'Đổi mật khẩu thành công' };
   }
 }
