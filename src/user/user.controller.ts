@@ -50,6 +50,77 @@ export class UserController {
     return this.userService.create(createUserDto);
   }
 
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      storage: diskStorage({
+        destination: './uploads/avatars',
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const ext = extname(file.originalname);
+          cb(null, `user-${uniqueSuffix}${ext}`);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+          return cb(
+            new BadRequestException(
+              'Chỉ chấp nhận file ảnh: jpg, jpeg, png, gif',
+            ),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+    }),
+  )
+  async createAdmin(
+    @Body() createUserDto: CreateUserDto,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: RequestWithUser,
+  ) {
+    // Kiểm tra quyền admin
+    if (req.user.role !== 'admin') {
+      throw new UnauthorizedException('Bạn không có quyền tạo người dùng');
+    }
+
+    // Thêm avatar vào DTO nếu có file upload
+    if (file) {
+      createUserDto.avatar = `/uploads/avatars/${file.filename}`;
+    }
+
+    try {
+      return await this.userService.create(createUserDto, true);
+    } catch (error) {
+      // Improve error logging
+      console.error('Error creating user:', error);
+
+      // Handle specific errors
+      if (
+        error instanceof Error &&
+        error.message.includes('email') &&
+        error.message.includes('đã tồn tại')
+      ) {
+        throw new BadRequestException('Email đã được sử dụng');
+      }
+
+      if (
+        error instanceof Error &&
+        error.message.includes('username') &&
+        error.message.includes('đã tồn tại')
+      ) {
+        throw new BadRequestException('Tên đăng nhập đã được sử dụng');
+      }
+
+      throw error;
+    }
+  }
+
   @Get('verify-email')
   async verifyEmail(@Query('token') token: string) {
     return this.userService.verifyEmail(token);
@@ -101,7 +172,7 @@ export class UserController {
         cb(null, true);
       },
       limits: {
-        fileSize: 2 * 1024 * 1024, // 2MB
+        fileSize: 5 * 1024 * 1024, // 2MB
       },
     }),
   )
@@ -144,8 +215,28 @@ export class UserController {
     return this.userService.update(id, updateUserDto);
   }
 
+  // @Delete(':id')
+  // remove(@Param('id') id: number) {
+  //   return this.userService.remove(id);
+  // }
   @Delete(':id')
-  remove(@Param('id') id: number) {
+  @UseGuards(JwtAuthGuard)
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: RequestWithUser,
+  ) {
+    // Kiểm tra quyền - chỉ admin mới có thể xóa người dùng
+    if (req.user.role !== 'admin') {
+      throw new UnauthorizedException('Bạn không có quyền xóa người dùng');
+    }
+
+    // Ngăn chặn admin tự xóa tài khoản của mình
+    if (req.user.user_id === id) {
+      throw new BadRequestException(
+        'Bạn không thể xóa tài khoản của chính mình',
+      );
+    }
+
     return this.userService.remove(id);
   }
 

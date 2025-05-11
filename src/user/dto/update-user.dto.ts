@@ -14,4 +14,5 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
 
   currentPassword?: string; // Mật khẩu hiện tại (nếu cần xác thực trước khi thay đổi mật khẩu mới)
   newPassword?: string; // Mật khẩu mới (nếu cần thay đổi)
+  status: any;
 }

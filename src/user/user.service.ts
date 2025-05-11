@@ -15,6 +15,8 @@ import { AuthService } from 'src/auth/auth.service';
 import { MailService } from '../mail/mail.service';
 import { GoogleAuthDto } from 'src/user/dto/google-auth.dto';
 
+import * as fs from 'fs';
+
 @Injectable()
 export class UserService {
   constructor(
@@ -23,8 +25,63 @@ export class UserService {
     private mailService: MailService,
   ) {} // Hang này sẽ tự động tạo một instance của User repository và gán nó vào biến userRepo.
 
+  // ============== CREATE USER ==================
   // Tạo một người dùng mới với thông tin từ createUserDto
-  async create(createUserDto: CreateUserDto) {
+  // async create(createUserDto: CreateUserDto) {
+  //   const existingUser = await this.userRepo.findOne({
+  //     where: [
+  //       { email: createUserDto.email },
+  //       { username: createUserDto.username },
+  //     ],
+  //   });
+  //   // Kiểm tra xem email hoặc username đã tồn tại chưa
+  //   if (existingUser && existingUser.email === createUserDto.email) {
+  //     throw new NotFoundException(`Email ${createUserDto.email} đã tồn tại`);
+  //   }
+  //   if (existingUser && existingUser.username === createUserDto.username) {
+  //     throw new NotFoundException(
+  //       `Tên đăng nhập ${createUserDto.username} đã tồn tại`,
+  //     );
+  //   }
+
+  //   // Tạo mã xác thực 6 chữ số
+  //   const verificationCode = Math.floor(
+  //     100000 + Math.random() * 900000,
+  //   ).toString();
+  //   const verificationExpires = new Date();
+  //   verificationExpires.setMinutes(verificationExpires.getMinutes() + 15); // Hết hạn sau 15 phút
+
+  //   // Tạo một salt mới để mã hoá mật khẩu
+  //   const salt = bcrypt.genSaltSync();
+  //   // Mã hoá mật khẩu mới với salt đã tạo
+  //   const hashPassword = await bcrypt.hash(createUserDto.password, salt);
+
+  //   const newUser = this.userRepo.create({
+  //     ...createUserDto,
+  //     password: hashPassword,
+  //     role: 'customer', // Mặc định là customer
+  //     created_at: new Date(), // Ngày tạo tài khoản
+  //     verification_token: verificationCode,
+  //     verification_expires: verificationExpires,
+  //     is_verified: false,
+  //   });
+  //   // Lưu người dùng mới vào cơ sở dữ liệu
+  //   await this.userRepo.save(newUser);
+
+  //   // Gửi email xác thực
+  //   await this.mailService.sendVerificationCode(
+  //     newUser.email,
+  //     verificationCode,
+  //   );
+
+  //   return {
+  //     message: 'Vui lòng kiểm tra email để lấy mã xác thực',
+  //     email: newUser.email,
+  //   };
+  // }
+
+  async create(createUserDto: CreateUserDto, byAdmin = false) {
+    // Nếu không phải admin tạo tài khoản, kiểm tra xem email hoặc username đã tồn tại chưa
     const existingUser = await this.userRepo.findOne({
       where: [
         { email: createUserDto.email },
@@ -58,25 +115,42 @@ export class UserService {
       password: hashPassword,
       role: 'customer', // Mặc định là customer
       created_at: new Date(), // Ngày tạo tài khoản
-      verification_token: verificationCode,
-      verification_expires: verificationExpires,
-      is_verified: false,
+      // Nếu admin tạo, tự động xác thực và không cần mã xác nhận
+      is_verified: byAdmin,
+      verification_token: byAdmin
+        ? null
+        : Math.floor(100000 + Math.random() * 900000).toString(),
+      verification_expires: byAdmin
+        ? null
+        : new Date(Date.now() + 15 * 60 * 1000),
     });
     // Lưu người dùng mới vào cơ sở dữ liệu
     await this.userRepo.save(newUser);
 
-    // Gửi email xác thực
-    await this.mailService.sendVerificationCode(
-      newUser.email,
-      verificationCode,
-    );
+    // Nếu không phải do admin tạo, gửi email xác thực
+    if (!byAdmin && newUser.verification_token) {
+      await this.mailService.sendVerificationCode(
+        newUser.email,
+        newUser.verification_token,
+      );
+      return {
+        message: 'Vui lòng kiểm tra email để lấy mã xác thực',
+        email: newUser.email,
+      };
+    }
 
     return {
-      message: 'Vui lòng kiểm tra email để lấy mã xác thực',
-      email: newUser.email,
+      message: 'Tạo người dùng thành công',
+      user: {
+        user_id: newUser.user_id,
+        username: newUser.username,
+        email: newUser.email,
+        role: newUser.role,
+      },
     };
   }
 
+  // ============== VERIFY EMAIL ==================
   // Xác thực email
   // Nếu token hợp lệ, cập nhật trạng thái is_verified thành true và xoá token
   async verifyEmail(token: string) {
@@ -95,6 +169,7 @@ export class UserService {
     return { message: 'Email verified successfully' };
   }
 
+  // ============== VERIFY CODE ==================
   async verifyCode(email: string, code: string) {
     const user = await this.userRepo.findOne({
       where: {
@@ -116,6 +191,7 @@ export class UserService {
     return { message: 'Xác thực thành công' };
   }
 
+  // ============== RESEND VERIFY CODE ==================
   async resendVerificationCode(email: string) {
     const user = await this.userRepo.findOne({ where: { email } });
 
@@ -142,11 +218,13 @@ export class UserService {
     return { message: 'Đã gửi lại mã xác thực mới' };
   }
 
+  // ============== FIND ALL USERS ==================
   // Tìm tất cả người dùng trong cơ sở dữ liệu
   findAll() {
     return this.userRepo.find();
   }
 
+  // ============== FIND ONE USER ==================
   // Tìm một người dùng theo ID
   async findOne(user_id: number) {
     const user = await this.userRepo.findOneBy({ user_id });
@@ -154,7 +232,7 @@ export class UserService {
     return user;
   }
 
-  // Cập nhật thông tin người dùng
+  // ============== UPDATE USER ==================
   async update(user_id: number, updateUserDto: UpdateUserDto) {
     const user = await this.findOne(user_id);
 
@@ -191,10 +269,26 @@ export class UserService {
     return this.userRepo.save(updatedUser);
   }
 
-  // Xoá người dùng khỏi cơ sở dữ liệu
+  // ============== DELETE USER ==================
   async remove(user_id: number) {
     const user = await this.findOne(user_id);
     if (!user) throw new NotFoundException(`User with ID ${user_id} not found`);
+
+    // // Xóa avatar từ filesystem nếu có và không phải avatar mặc định
+    if (
+      user.avatar &&
+      !user.avatar.includes('default') &&
+      fs.existsSync(`.${user.avatar}`)
+    ) {
+      try {
+        fs.unlinkSync(`.${user.avatar}`);
+        console.log(`Đã xóa avatar: ${user.avatar}`);
+      } catch (error) {
+        console.error('Lỗi khi xóa avatar:', error);
+        // Tiếp tục xóa user ngay cả khi xóa file avatar thất bại
+      }
+    }
+
     await this.userRepo.delete(user_id);
   }
 
@@ -369,7 +463,7 @@ export class UserService {
     };
   }
 
-  // Lấy thông tin người dùng từ token
+  // ============== GET PROFILE BY ID ==================
   async getFullProfile(userId: number) {
     const user = await this.userRepo.findOne({
       where: { user_id: userId },
