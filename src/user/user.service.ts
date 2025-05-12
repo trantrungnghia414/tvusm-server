@@ -23,72 +23,18 @@ export class UserService {
     @InjectRepository(User) private userRepo: Repository<User>,
     private readonly authService: AuthService,
     private mailService: MailService,
-  ) {} // Hang này sẽ tự động tạo một instance của User repository và gán nó vào biến userRepo.
+  ) {}
 
-  // ============== CREATE USER ==================
-  // Tạo một người dùng mới với thông tin từ createUserDto
-  // async create(createUserDto: CreateUserDto) {
-  //   const existingUser = await this.userRepo.findOne({
-  //     where: [
-  //       { email: createUserDto.email },
-  //       { username: createUserDto.username },
-  //     ],
-  //   });
-  //   // Kiểm tra xem email hoặc username đã tồn tại chưa
-  //   if (existingUser && existingUser.email === createUserDto.email) {
-  //     throw new NotFoundException(`Email ${createUserDto.email} đã tồn tại`);
-  //   }
-  //   if (existingUser && existingUser.username === createUserDto.username) {
-  //     throw new NotFoundException(
-  //       `Tên đăng nhập ${createUserDto.username} đã tồn tại`,
-  //     );
-  //   }
-
-  //   // Tạo mã xác thực 6 chữ số
-  //   const verificationCode = Math.floor(
-  //     100000 + Math.random() * 900000,
-  //   ).toString();
-  //   const verificationExpires = new Date();
-  //   verificationExpires.setMinutes(verificationExpires.getMinutes() + 15); // Hết hạn sau 15 phút
-
-  //   // Tạo một salt mới để mã hoá mật khẩu
-  //   const salt = bcrypt.genSaltSync();
-  //   // Mã hoá mật khẩu mới với salt đã tạo
-  //   const hashPassword = await bcrypt.hash(createUserDto.password, salt);
-
-  //   const newUser = this.userRepo.create({
-  //     ...createUserDto,
-  //     password: hashPassword,
-  //     role: 'customer', // Mặc định là customer
-  //     created_at: new Date(), // Ngày tạo tài khoản
-  //     verification_token: verificationCode,
-  //     verification_expires: verificationExpires,
-  //     is_verified: false,
-  //   });
-  //   // Lưu người dùng mới vào cơ sở dữ liệu
-  //   await this.userRepo.save(newUser);
-
-  //   // Gửi email xác thực
-  //   await this.mailService.sendVerificationCode(
-  //     newUser.email,
-  //     verificationCode,
-  //   );
-
-  //   return {
-  //     message: 'Vui lòng kiểm tra email để lấy mã xác thực',
-  //     email: newUser.email,
-  //   };
-  // }
-
+  // Cập nhật phương thức create để đảm bảo các trường mới được xử lý đúng
   async create(createUserDto: CreateUserDto, byAdmin = false) {
-    // Nếu không phải admin tạo tài khoản, kiểm tra xem email hoặc username đã tồn tại chưa
+    // Kiểm tra email hoặc username đã tồn tại chưa
     const existingUser = await this.userRepo.findOne({
       where: [
         { email: createUserDto.email },
         { username: createUserDto.username },
       ],
     });
-    // Kiểm tra xem email hoặc username đã tồn tại chưa
+
     if (existingUser && existingUser.email === createUserDto.email) {
       throw new NotFoundException(`Email ${createUserDto.email} đã tồn tại`);
     }
@@ -110,20 +56,21 @@ export class UserService {
     // Mã hoá mật khẩu mới với salt đã tạo
     const hashPassword = await bcrypt.hash(createUserDto.password, salt);
 
+    // Xác định status nếu không được cung cấp
+    const status = byAdmin ? 'active' : 'inactive';
+
     const newUser = this.userRepo.create({
       ...createUserDto,
       password: hashPassword,
-      role: 'customer', // Mặc định là customer
+      role: createUserDto.role || 'customer', // Mặc định là customer
       created_at: new Date(), // Ngày tạo tài khoản
       // Nếu admin tạo, tự động xác thực và không cần mã xác nhận
       is_verified: byAdmin,
-      verification_token: byAdmin
-        ? null
-        : Math.floor(100000 + Math.random() * 900000).toString(),
-      verification_expires: byAdmin
-        ? null
-        : new Date(Date.now() + 15 * 60 * 1000),
+      verification_token: byAdmin ? null : verificationCode,
+      verification_expires: byAdmin ? null : verificationExpires,
+      status: status,
     });
+
     // Lưu người dùng mới vào cơ sở dữ liệu
     await this.userRepo.save(newUser);
 
@@ -146,6 +93,9 @@ export class UserService {
         username: newUser.username,
         email: newUser.email,
         role: newUser.role,
+        fullname: newUser.fullname,
+        is_verified: newUser.is_verified,
+        status: newUser.status,
       },
     };
   }
@@ -297,9 +247,20 @@ export class UserService {
     const user = await this.userRepo.findOne({
       where: [{ email: login }, { username: login }],
     });
+
     if (!user)
       throw new NotFoundException(`User with email ${login} not found`);
 
+    // Kiểm tra trạng thái tài khoản - thêm đoạn này
+    if (user.status === 'inactive' || user.status === 'banned') {
+      throw new UnauthorizedException(
+        `Tài khoản của bạn đã bị ${
+          user.status === 'inactive' ? 'tạm khóa' : 'cấm'
+        }. Vui lòng liên hệ quản trị viên để được hỗ trợ.`,
+      );
+    }
+
+    // Kiểm tra xác thực email
     if (!user.is_verified) {
       // Gửi lại mã xác thực thay vì gửi email với link
       const verificationCode = Math.floor(
@@ -321,6 +282,7 @@ export class UserService {
       });
     }
 
+    // Kiểm tra mật khẩu
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) throw new NotFoundException(`Invalid password`);
 
@@ -388,6 +350,15 @@ export class UserService {
       where: [{ email }, { google_id: googleId }],
     });
 
+    // Thêm kiểm tra trạng thái tài khoản sau khi tìm thấy user
+    if (user && (user.status === 'inactive' || user.status === 'banned')) {
+      throw new UnauthorizedException(
+        `Tài khoản của bạn đã bị ${
+          user.status === 'inactive' ? 'tạm khóa' : 'cấm'
+        }. Vui lòng liên hệ quản trị viên để được hỗ trợ.`,
+      );
+    }
+
     if (!user) {
       // TH1: Người dùng chưa tồn tại - Tạo tài khoản mới
       console.log('Creating new user for Google login');
@@ -416,17 +387,18 @@ export class UserService {
       const salt = bcrypt.genSaltSync();
       const hashPassword = await bcrypt.hash(randomPassword, salt);
 
-      // Tạo người dùng mới
+      // Tạo người dùng mới từ Google (đã bỏ user_type)
       user = this.userRepo.create({
         email,
         username,
         password: hashPassword,
         google_id: googleId,
         is_verified: true, // Tài khoản Google đã được xác thực
-        name: name || username,
+        fullname: name || username,
         avatar: picture,
         role: 'customer', // Mặc định là khách hàng
         created_at: new Date(),
+        status: 'active',
       });
 
       await this.userRepo.save(user);
@@ -439,7 +411,7 @@ export class UserService {
       user.google_id = googleId;
       user.is_verified = true; // Tự động xác thực tài khoản
       if (picture && !user.avatar) user.avatar = picture;
-      if (name && !user.name) user.name = name;
+      if (name && !user.fullname) user.fullname = name; // Sử dụng fullname thay vì name
 
       await this.userRepo.save(user);
       console.log('User linked to Google:', user.username);
@@ -459,7 +431,7 @@ export class UserService {
       email: user.email,
       role: user.role,
       avatar: user.avatar,
-      name: user.name,
+      fullname: user.fullname, // Sử dụng fullname thay vì name
     };
   }
 

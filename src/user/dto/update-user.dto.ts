@@ -1,18 +1,45 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateUserDto } from './create-user.dto';
+import { IsOptional, IsString } from 'class-validator';
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
-  // Các thuộc tính có thể được cập nhật
-  name?: string; // Tên người dùng
-  email?: string; // Địa chỉ email
-  password?: string; // Mật khẩu (nếu cần thay đổi)
-  phone?: string; // Số điện thoại
-  address?: string; // Địa chỉ
-  role?: string; // Vai trò của người dùng (admin, user, v.v.)
-  avatar?: string; // Đường dẫn đến ảnh đại diện
-  created_at?: Date; // Ngày tạo tài khoản
+  @IsString()
+  @IsOptional()
+  fullname?: string;
 
-  currentPassword?: string; // Mật khẩu hiện tại (nếu cần xác thực trước khi thay đổi mật khẩu mới)
-  newPassword?: string; // Mật khẩu mới (nếu cần thay đổi)
-  status: any;
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
+  @IsString()
+  @IsOptional()
+  role?: string;
+
+  @IsString()
+  @IsOptional()
+  avatar?: string;
+
+  @IsString()
+  @IsOptional()
+  status?: string;
+
+  @IsString()
+  @IsOptional()
+  student_id?: string;
+
+  @IsString()
+  @IsOptional()
+  department?: string;
+
+  @IsString()
+  @IsOptional()
+  user_type?: string;
+
+  @IsString()
+  @IsOptional()
+  currentPassword?: string;
+
+  @IsString()
+  @IsOptional()
+  newPassword?: string;
 }

@@ -1,10 +1,43 @@
-export class CreateUserDto {
-  username: string; // Tên đăng nhập
-  password: string; // Mật khẩu
-  fullname: string; // Họ tên
-  email: string; // Địa chỉ email
-  phone: string; // Số điện thoại
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
-  avatar: string; // Đường dẫn đến ảnh đại diện
-  role: string; // Vai trò của người dùng (user, admin)
+// Bỏ các trường liên quan
+export class CreateUserDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(8)
+  password: string;
+
+  @IsString()
+  @IsNotEmpty()
+  username: string;
+
+  @IsString()
+  @IsOptional()
+  fullname?: string;
+
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
+  @IsString()
+  @IsOptional()
+  role?: string;
+
+  @IsString()
+  @IsOptional()
+  avatar?: string;
+
+  @IsString()
+  @IsOptional()
+  status?: string;
 }

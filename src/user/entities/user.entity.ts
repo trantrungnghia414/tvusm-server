@@ -1,9 +1,9 @@
 import {
-  Column,
-  CreateDateColumn,
   Entity,
-  // OneToMany,
+  Column,
   PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 
 @Entity('users') //→ trỏ đúng tới tên bảng trong MySQL
@@ -11,17 +11,17 @@ export class User {
   @PrimaryGeneratedColumn() //→ khoá chính tự tăng
   user_id: number;
 
-  @Column({ unique: true })
-  username: string;
+  @Column({ unique: true, nullable: true })
+  email: string;
 
   @Column()
   password: string;
 
+  @Column({ unique: true })
+  username: string;
+
   @Column({ nullable: true })
   fullname: string;
-
-  @Column({ unique: true })
-  email: string;
 
   @Column({ nullable: true })
   phone: string;
@@ -48,22 +48,23 @@ export class User {
   @Column({ type: 'datetime', nullable: true })
   verification_expires: Date | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 
-  // Thêm các trường mới
-  @Column({ nullable: true, name: 'google_id' })
+  @Column({ nullable: true })
   google_id: string;
 
   @Column({ nullable: true })
   avatar: string;
 
-  @Column({ nullable: true })
-  name: string;
+  @Column({
+    type: 'enum',
+    enum: ['active', 'inactive', 'banned'],
+    default: 'active',
+    nullable: true,
+  })
+  status: string;
 
-  // @OneToMany(() => Booking, (booking) => booking.user)
-  // bookings: Booking[];
-
-  // @OneToMany(() => News, (news) => news.created_by)
-  // news: News[];
+  @UpdateDateColumn({ type: 'timestamp' })
+  updated_at: Date;
 }

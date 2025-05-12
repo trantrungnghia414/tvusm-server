@@ -1,13 +1,15 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { UserModule } from './user/user.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from 'src/user/entities/user.entity';
 import { AuthModule } from './auth/auth.module';
-import { MailService } from './mail/mail.service';
 import { ConfigModule } from '@nestjs/config';
+
 import { MailModule } from 'src/mail/mail.module';
+import { MailService } from './mail/mail.service';
+
+import { User } from 'src/user/entities/user.entity';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -18,7 +20,7 @@ import { MailModule } from 'src/mail/mail.module';
       port: 3306,
       username: 'root',
       password: '123456',
-      database: 'tvu_sports_center',
+      database: 'tvusm_db',
       entities: [User],
       synchronize: false, // Chỉ nên để true trong môi trường phát triển
     }),
