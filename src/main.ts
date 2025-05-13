@@ -18,6 +18,17 @@ import { join } from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Thêm cấu hình này để tự động chuyển đổi kiểu dữ liệu
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true, // Quan trọng: để class-transformer hoạt động
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+    }),
+  );
+
   // Thêm CORS cho port 3000
   app.enableCors({
     origin: ['http://localhost:3001', '*'],
@@ -25,7 +36,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  app.useGlobalPipes(new ValidationPipe());
+  // app.useGlobalPipes(new ValidationPipe());
 
   // Cấu hình để phục vụ tệp tĩnh
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
