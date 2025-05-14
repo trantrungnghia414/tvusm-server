@@ -10,8 +10,15 @@ import { MailService } from './mail/mail.service';
 
 import { User } from 'src/user/entities/user.entity';
 import { UserModule } from './user/user.module';
-import { VenueModule } from './venue/venue.module'; // Import VenueModule
-import { Venue } from './venue/entities/venue.entity'; // Import Venue entity
+
+import { VenueModule } from './venue/venue.module';
+import { Venue } from './venue/entities/venue.entity';
+
+import { CourtType } from 'src/court-type/entities/court-type.entity';
+import { CourtTypeModule } from 'src/court-type/court-type.module';
+
+import { Court } from 'src/court/entities/court.entity';
+import { CourtModule } from 'src/court/court.module';
 
 @Module({
   imports: [
@@ -23,13 +30,15 @@ import { Venue } from './venue/entities/venue.entity'; // Import Venue entity
       username: 'root',
       password: '123456',
       database: 'tvusm_db',
-      entities: [User, Venue], // Thêm Venue entity vào danh sách
+      entities: [User, Venue, CourtType, Court],
       synchronize: false, // Chỉ nên để true trong môi trường phát triển
     }),
     UserModule,
     AuthModule,
     MailModule,
-    VenueModule, // Đăng ký VenueModule
+    VenueModule,
+    CourtTypeModule,
+    CourtModule,
     ConfigModule.forRoot({
       isGlobal: true, // Để biến môi trường có thể sử dụng ở bất kỳ đâu trong ứng dụng
     }),

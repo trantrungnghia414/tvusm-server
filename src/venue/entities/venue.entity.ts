@@ -4,9 +4,9 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  // OneToMany,
+  OneToMany,
 } from 'typeorm';
-// import { Court } from '../../court/entities/court.entity';
+import { Court } from '../../court/entities/court.entity';
 
 @Entity('venues')
 export class Venue {
@@ -42,6 +42,6 @@ export class Venue {
   updated_at: Date;
 
   // Mối quan hệ 1-n: một nhà thi đấu có nhiều sân
-  // @OneToMany(() => Court, (court) => court.venue)
-  // courts: Court[];
+  @OneToMany(() => Court, (court) => court.venue)
+  courts: Court[];
 }

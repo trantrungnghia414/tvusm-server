@@ -1,0 +1,56 @@
+import {
+  IsNotEmpty,
+  IsString,
+  IsNumber,
+  IsEnum,
+  IsOptional,
+  IsBoolean,
+  Min,
+  MaxLength,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class CreateCourtDto {
+  @IsNotEmpty({ message: 'Tên sân không được để trống' })
+  @IsString({ message: 'Tên sân phải là chuỗi' })
+  @MaxLength(100, { message: 'Tên sân không được vượt quá 100 ký tự' })
+  name: string;
+
+  @IsNotEmpty({ message: 'Mã sân không được để trống' })
+  @IsString({ message: 'Mã sân phải là chuỗi' })
+  @MaxLength(20, { message: 'Mã sân không được vượt quá 20 ký tự' })
+  code: string;
+
+  @IsOptional()
+  @IsString({ message: 'Mô tả phải là chuỗi' })
+  description?: string;
+
+  @IsNotEmpty({ message: 'Giá thuê theo giờ không được để trống' })
+  @Type(() => Number)
+  @IsNumber({}, { message: 'Giá thuê phải là số' })
+  @Min(0, { message: 'Giá thuê không được âm' })
+  hourly_rate: number;
+
+  @IsOptional()
+  @IsEnum(['available', 'booked', 'maintenance'], {
+    message: 'Trạng thái phải là available, booked hoặc maintenance',
+  })
+  status?: 'available' | 'booked' | 'maintenance';
+
+  @IsOptional()
+  @IsBoolean({ message: 'Sân trong nhà phải là giá trị boolean' })
+  is_indoor?: boolean;
+
+  @IsNotEmpty({ message: 'ID nhà thi đấu không được để trống' })
+  @Type(() => Number)
+  @IsNumber({}, { message: 'ID nhà thi đấu phải là số' })
+  venue_id: number;
+
+  @IsNotEmpty({ message: 'ID loại sân không được để trống' })
+  @Type(() => Number)
+  @IsNumber({}, { message: 'ID loại sân phải là số' })
+  type_id: number;
+
+  @IsOptional()
+  image?: string;
+}
