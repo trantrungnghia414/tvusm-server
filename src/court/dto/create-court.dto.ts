@@ -4,11 +4,11 @@ import {
   IsNumber,
   IsEnum,
   IsOptional,
-  IsBoolean,
+  // IsBoolean,
   Min,
   MaxLength,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class CreateCourtDto {
   @IsNotEmpty({ message: 'Tên sân không được để trống' })
@@ -38,8 +38,13 @@ export class CreateCourtDto {
   status?: 'available' | 'booked' | 'maintenance';
 
   @IsOptional()
-  @IsBoolean({ message: 'Sân trong nhà phải là giá trị boolean' })
-  is_indoor?: boolean;
+  @IsNotEmpty({ message: 'Trường trong nhà/ngoài trời phải được xác định' })
+  @Transform(({ value }) => {
+    if (value === 'true' || value === '1' || value === 1) return 1;
+    if (value === 'false' || value === '0' || value === 0) return 0;
+    return value ? 1 : 0;
+  })
+  is_indoor?: number; // Thay vì boolean
 
   @IsNotEmpty({ message: 'ID nhà thi đấu không được để trống' })
   @Type(() => Number)

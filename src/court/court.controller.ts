@@ -64,6 +64,29 @@ export class CourtController {
     if (file) {
       createCourtDto.image = `/uploads/courts/${file.filename}`;
     }
+
+    if (createCourtDto.is_indoor !== undefined) {
+      // Chuyển đổi tất cả các giá trị có thể thành 0/1
+      if (typeof createCourtDto.is_indoor === 'string') {
+        const value = (createCourtDto.is_indoor as string).toLowerCase();
+
+        if (
+          value === 'false' ||
+          value === '0' ||
+          value === 'outdoor' ||
+          value === ''
+        ) {
+          createCourtDto.is_indoor = 0; // Lưu số 0 thay vì boolean false
+        } else {
+          createCourtDto.is_indoor = 1; // Lưu số 1 thay vì boolean true
+        }
+      } else if (typeof createCourtDto.is_indoor === 'boolean') {
+        createCourtDto.is_indoor = createCourtDto.is_indoor ? 1 : 0; // Chuyển boolean thành số
+      } else if (typeof createCourtDto.is_indoor === 'number') {
+        createCourtDto.is_indoor = createCourtDto.is_indoor ? 1 : 0; // Đảm bảo chỉ lưu 0 hoặc 1
+      }
+    }
+
     return this.courtService.create(createCourtDto);
   }
 
@@ -126,6 +149,29 @@ export class CourtController {
     if (file) {
       updateCourtDto.image = `/uploads/courts/${file.filename}`;
     }
+
+    if (updateCourtDto.is_indoor !== undefined) {
+      // Chuyển đổi tất cả các giá trị có thể thành 0/1
+      if (typeof updateCourtDto.is_indoor === 'string') {
+        const value = (updateCourtDto.is_indoor as string).toLowerCase();
+
+        if (
+          value === 'false' ||
+          value === '0' ||
+          value === 'outdoor' ||
+          value === ''
+        ) {
+          updateCourtDto.is_indoor = 0; // Lưu số 0 thay vì boolean false
+        } else {
+          updateCourtDto.is_indoor = 1; // Lưu số 1 thay vì boolean true
+        }
+      } else if (typeof updateCourtDto.is_indoor === 'boolean') {
+        updateCourtDto.is_indoor = updateCourtDto.is_indoor ? 1 : 0; // Chuyển boolean thành số
+      } else if (typeof updateCourtDto.is_indoor === 'number') {
+        updateCourtDto.is_indoor = updateCourtDto.is_indoor ? 1 : 0; // Đảm bảo chỉ lưu 0 hoặc 1
+      }
+    }
+
     return this.courtService.update(id, updateCourtDto);
   }
 

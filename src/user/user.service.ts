@@ -136,6 +136,7 @@ export class UserService {
     user.is_verified = true;
     user.verification_token = null;
     user.verification_expires = null;
+    user.status = 'active'; // Đặt trạng thái người dùng là active khi xác thực thành công
     await this.userRepo.save(user);
 
     return { message: 'Xác thực thành công' };
