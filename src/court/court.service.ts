@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DeepPartial, Repository } from 'typeorm';
 import * as fs from 'fs';
 import { Court } from './entities/court.entity';
 import { CreateCourtDto } from './dto/create-court.dto';
@@ -35,7 +35,13 @@ export class CourtService {
         );
       }
 
-      const newCourt = this.courtRepository.create(createCourtDto);
+      // Thực hiện chuyển đổi dữ liệu từ DTO sang entity
+      const courtData: DeepPartial<Court> = {
+        ...createCourtDto,
+        is_indoor: createCourtDto.is_indoor === 1, // Chuyển đổi từ number sang boolean
+      };
+
+      const newCourt = this.courtRepository.create(courtData);
       return this.courtRepository.save(newCourt);
     } catch (error) {
       if (error instanceof ConflictException) {

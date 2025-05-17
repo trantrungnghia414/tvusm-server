@@ -16,4 +16,8 @@ export class CreateCourtTypeDto {
     message: 'Kích thước tiêu chuẩn không được vượt quá 50 ký tự',
   })
   standard_size?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Đường dẫn ảnh phải là chuỗi ký tự' })
+  image?: string;
 }

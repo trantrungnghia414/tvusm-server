@@ -10,6 +10,9 @@ import { CourtType } from './entities/court-type.entity';
 import { CreateCourtTypeDto } from './dto/create-court-type.dto';
 import { UpdateCourtTypeDto } from './dto/update-court-type.dto';
 
+import * as fs from 'fs';
+import { join } from 'path';
+
 @Injectable()
 export class CourtTypeService {
   constructor(
@@ -106,6 +109,24 @@ export class CourtTypeService {
         }
       }
 
+      // Nếu có ảnh mới, xóa ảnh cũ
+      if (
+        updateCourtTypeDto.image &&
+        courtType.image &&
+        typeof courtType.image === 'string' &&
+        !courtType.image.startsWith('http')
+      ) {
+        try {
+          const imagePath = join(process.cwd(), `.${courtType.image}`);
+          if (fs.existsSync(imagePath)) {
+            fs.unlinkSync(imagePath);
+            console.log(`Đã xóa ảnh cũ: ${imagePath}`);
+          }
+        } catch (err) {
+          console.error('Lỗi khi xóa file ảnh cũ:', err);
+        }
+      }
+
       Object.assign(courtType, updateCourtTypeDto);
       return this.courtTypeRepository.save(courtType);
     } catch (error) {
@@ -126,6 +147,26 @@ export class CourtTypeService {
   async remove(id: number): Promise<void> {
     try {
       const courtType = await this.findOne(id);
+
+      // Xóa ảnh nếu có
+      if (
+        courtType &&
+        courtType.image &&
+        typeof courtType.image === 'string' &&
+        !courtType.image.startsWith('http')
+      ) {
+        try {
+          const imagePath = join(process.cwd(), `.${courtType.image}`);
+          if (fs.existsSync(imagePath)) {
+            fs.unlinkSync(imagePath);
+            console.log(`Đã xóa ảnh: ${imagePath}`);
+          }
+        } catch (err) {
+          console.error('Lỗi khi xóa file ảnh:', err);
+          // Vẫn tiếp tục xóa loại sân ngay cả khi xóa ảnh thất bại
+        }
+      }
+
       await this.courtTypeRepository.remove(courtType);
     } catch (error) {
       if (error instanceof NotFoundException) {

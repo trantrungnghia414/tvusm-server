@@ -22,6 +22,9 @@ export class CourtType {
   @Column({ length: 50, nullable: true })
   standard_size: string;
 
+  @Column({ nullable: true })
+  image: string;
+
   @OneToMany(() => Court, (court) => court.type)
   courts: Court[];
 
