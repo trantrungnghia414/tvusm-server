@@ -20,6 +20,9 @@ import { CourtTypeModule } from 'src/court-type/court-type.module';
 import { Court } from 'src/court/entities/court.entity';
 import { CourtModule } from 'src/court/court.module';
 
+import { CourtMapping } from 'src/court-mapping/entities/court-mapping.entity';
+import { CourtMappingModule } from 'src/court-mapping/court-mapping.module';
+
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -30,7 +33,7 @@ import { CourtModule } from 'src/court/court.module';
       username: 'root',
       password: '123456',
       database: 'tvusm_db',
-      entities: [User, Venue, CourtType, Court],
+      entities: [User, Venue, CourtType, Court, CourtMapping],
       synchronize: false, // Chỉ nên để true trong môi trường phát triển
     }),
     UserModule,
@@ -39,6 +42,7 @@ import { CourtModule } from 'src/court/court.module';
     VenueModule,
     CourtTypeModule,
     CourtModule,
+    CourtMappingModule,
     ConfigModule.forRoot({
       isGlobal: true, // Để biến môi trường có thể sử dụng ở bất kỳ đâu trong ứng dụng
     }),
