@@ -6,7 +6,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not } from 'typeorm';
 import { CourtMapping } from './entities/court-mapping.entity';
 import { Court } from '../court/entities/court.entity';
 import { CreateCourtMappingDto } from 'src/court-mapping/dto/create-court-mapping.dto';
@@ -53,7 +53,7 @@ export class CourtMappingService {
         child_court_name: mapping.childCourt?.name,
         child_court_code: mapping.childCourt?.code,
       }));
-    } catch (error) {
+    } catch {
       throw new InternalServerErrorException(
         'Không thể lấy danh sách ghép sân',
       );
@@ -155,9 +155,11 @@ export class CourtMappingService {
       }
 
       // Tạo mối quan hệ mới
-      const newMapping = this.courtMappingRepository.create(
-        createCourtMappingDto,
-      );
+      const newMapping = this.courtMappingRepository.create({
+        parent_court_id: createCourtMappingDto.parent_court_id,
+        child_court_id: createCourtMappingDto.child_court_id,
+        position: createCourtMappingDto.position || undefined,
+      });
       return this.courtMappingRepository.save(newMapping);
     } catch (error) {
       if (
@@ -210,7 +212,7 @@ export class CourtMappingService {
         const childInOtherMapping = await this.courtMappingRepository.findOne({
           where: {
             child_court_id: updateCourtMappingDto.child_court_id,
-            mapping_id: { not: id }, // Loại trừ mapping hiện tại
+            mapping_id: Not(id), // Loại trừ mapping hiện tại
           },
         });
 
@@ -230,7 +232,7 @@ export class CourtMappingService {
           where: {
             parent_court_id: updateCourtMappingDto.parent_court_id,
             child_court_id: updateCourtMappingDto.child_court_id,
-            mapping_id: { not: id }, // Loại trừ mapping hiện tại
+            mapping_id: Not(id), // Loại trừ mapping hiện tại
           },
         });
 
