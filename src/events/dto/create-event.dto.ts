@@ -5,28 +5,27 @@ import {
   IsOptional,
   IsBoolean,
   IsNumber,
-  // IsDate,
   IsPositive,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { EventStatus, EventType } from '../entities/event.entity';
 
 export class CreateEventDto {
-  @IsString()
   @IsNotEmpty()
+  @IsString()
   title: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   description?: string;
 
   @IsNotEmpty()
-  @Type(() => Date)
-  start_date: Date;
+  @IsString()
+  start_date: string;
 
   @IsOptional()
-  @Type(() => Date)
-  end_date?: Date;
+  @IsString()
+  end_date?: string;
 
   @IsOptional()
   @IsString()
@@ -43,6 +42,10 @@ export class CreateEventDto {
   @IsOptional()
   @IsNumber()
   court_id?: number;
+
+  @IsOptional()
+  @IsNumber()
+  organizer_id?: number;
 
   @IsEnum(EventType)
   event_type: EventType;
@@ -67,8 +70,11 @@ export class CreateEventDto {
   @Type(() => Date)
   registration_deadline?: Date;
 
-  // Thêm thuộc tính image
   @IsOptional()
   @IsString()
   image?: string;
+
+  @IsString()
+  @IsOptional()
+  organizer_name: string;
 }

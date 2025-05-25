@@ -11,8 +11,7 @@ import {
 import { User } from '../../user/entities/user.entity';
 import { Venue } from '../../venue/entities/venue.entity';
 import { Court } from '../../court/entities/court.entity';
-import { EventParticipant } from 'src/events/entities/event-participant.entity';
-// import { EventParticipant } from './event-participant.entity';
+import { EventParticipant } from './event-participant.entity';
 
 export enum EventStatus {
   UPCOMING = 'upcoming',
@@ -29,7 +28,7 @@ export enum EventType {
   OTHER = 'other',
 }
 
-@Entity('events') // Phải có decorator này và tên bảng trong database
+@Entity('events')
 export class Event {
   @PrimaryGeneratedColumn()
   event_id: number;
@@ -110,12 +109,17 @@ export class Event {
   @UpdateDateColumn()
   updated_at: Date;
 
-  @Column({ type: 'int', generated: true, select: false })
+  // Loại bỏ thuộc tính generated: true trên các cột này
+  // Thay vì dùng generated, ta có thể tính toán giá trị này từ application
+  @Column({ type: 'int', nullable: true })
   duration_days: number;
 
-  @Column({ type: 'tinyint', generated: true, select: false })
+  @Column({ type: 'tinyint', nullable: true })
   event_day_of_week: number;
 
   @OneToMany(() => EventParticipant, (participant) => participant.event)
   participants: EventParticipant[];
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  organizer_name: string;
 }

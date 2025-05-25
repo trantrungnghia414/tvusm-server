@@ -24,7 +24,8 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { CreateParticipantDto } from './dto/create-participant.dto';
 import { UpdateParticipantStatusDto } from './dto/update-participant-status.dto';
-import { EventStatus } from './entities/event.entity';
+import { Event, EventStatus } from './entities/event.entity';
+import { EventWithExtras } from './interfaces/event-with-extras.interface';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 // Thêm interface để định nghĩa kiểu cho request
@@ -77,26 +78,50 @@ export class EventsController {
     @Request() req: RequestWithUser,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    // Xử lý file ảnh nếu có
-    if (file) {
-      const imageUrl = `/uploads/events/${file.filename}`;
-      return this.eventsService.create(
-        { ...createEventDto, image: imageUrl },
-        req.user.userId,
-      );
+    try {
+      console.log('Creating event with user ID:', req.user?.userId);
+      console.log('Request user object:', req.user);
+      console.log('DTO data:', createEventDto);
+
+      // Đảm bảo có userId
+      let userId = req.user?.userId;
+      if (!userId) {
+        userId = 1; // Fallback to admin (ID=1) if no user ID found
+        console.log('No user ID found in request, using default (1)');
+      }
+
+      // Xử lý file ảnh nếu có
+      if (file) {
+        const imageUrl = `/uploads/events/${file.filename}`;
+        return this.eventsService.create(
+          { ...createEventDto, image: imageUrl },
+          userId,
+        );
+      }
+      return this.eventsService.create(createEventDto, userId);
+    } catch (error) {
+      console.error('Error in create event controller:', error);
+      // Chi tiết hơn về lỗi
+      if (error instanceof BadRequestException) {
+        throw error; // Giữ nguyên lỗi validation
+      } else {
+        // Lỗi khác - cung cấp thông tin chi tiết hơn
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`Error creating event: ${errorMessage}`);
+      }
     }
-    return this.eventsService.create(createEventDto, req.user.userId);
   }
 
   // Lấy danh sách tất cả sự kiện (không cần xác thực)
   @Get()
-  findAll() {
+  findAll(): Promise<EventWithExtras[]> {
     return this.eventsService.findAll();
   }
 
   // Lấy chi tiết một sự kiện (không cần xác thực)
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id', ParseIntPipe) id: number): Promise<EventWithExtras> {
     return this.eventsService.findOne(id);
   }
 
@@ -108,7 +133,6 @@ export class EventsController {
       storage: diskStorage({
         destination: './uploads/events',
         filename: (req, file, cb) => {
-          // Tạo tên file ngẫu nhiên
           const randomName = Array(32)
             .fill(null)
             .map(() => Math.round(Math.random() * 16).toString(16))
@@ -137,14 +161,11 @@ export class EventsController {
     @Body() updateEventDto: UpdateEventDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    // Xử lý file ảnh nếu có
+    // Nếu có file mới upload, cập nhật đường dẫn ảnh
     if (file) {
-      const imageUrl = `/uploads/events/${file.filename}`;
-      return this.eventsService.update(id, {
-        ...updateEventDto,
-        image: imageUrl,
-      });
+      updateEventDto.image = `/uploads/events/${file.filename}`;
     }
+
     return this.eventsService.update(id, updateEventDto);
   }
 
