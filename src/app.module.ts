@@ -27,6 +27,8 @@ import { Event } from 'src/events/entities/event.entity';
 import { EventParticipant } from 'src/events/entities/event-participant.entity';
 import { EventsModule } from 'src/events/events.module';
 
+import { ScheduleModule } from '@nestjs/schedule';
+
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -59,6 +61,7 @@ import { EventsModule } from 'src/events/events.module';
     ConfigModule.forRoot({
       isGlobal: true, // Để biến môi trường có thể sử dụng ở bất kỳ đâu trong ứng dụng
     }),
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [AppService, MailService],

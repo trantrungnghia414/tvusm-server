@@ -2,11 +2,10 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThanOrEqual } from 'typeorm';
-import { Event, EventStatus } from './entities/event.entity'; // Đảm bảo import EventStatus
+import { Repository } from 'typeorm';
+import { Event, EventStatus } from './entities/event.entity';
 import { EventParticipant } from './entities/event-participant.entity';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -14,12 +13,9 @@ import { CreateParticipantDto } from './dto/create-participant.dto';
 import { UpdateParticipantStatusDto } from './dto/update-participant-status.dto';
 import { EventWithExtras } from './interfaces/event-with-extras.interface';
 import * as fs from 'fs';
-import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class EventsService {
-  private readonly logger = new Logger(EventsService.name);
-
   constructor(
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
@@ -78,33 +74,7 @@ export class EventsService {
         );
       }
 
-      // Xác định trạng thái tự động dựa trên thời gian
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Reset thời gian về 00:00:00
-
-      const startDate = new Date(createEventDto.start_date);
-      startDate.setHours(0, 0, 0, 0);
-
-      const endDate = createEventDto.end_date
-        ? new Date(createEventDto.end_date)
-        : null;
-
-      if (endDate) endDate.setHours(0, 0, 0, 0);
-
-      // Nếu người dùng muốn đặt trạng thái là cancelled, giữ nguyên
-      // Nếu không, tự động xác định dựa trên thời gian
-      if (createEventDto.status !== EventStatus.CANCELLED) {
-        // Sử dụng enum
-        if (startDate > today) {
-          createEventDto.status = EventStatus.UPCOMING; // Sử dụng enum
-        } else if (!endDate || today <= endDate) {
-          createEventDto.status = EventStatus.ONGOING; // Sử dụng enum
-        } else {
-          createEventDto.status = EventStatus.COMPLETED; // Sử dụng enum
-        }
-      }
-
-      // Tạo sự kiện mới với trạng thái đã xác định
+      // Tạo sự kiện mới với organizer_id là user hiện tại
       const event = this.eventRepository.create({
         ...createEventDto,
         organizer_id: organizerId,
@@ -168,35 +138,16 @@ export class EventsService {
   }
 
   async update(id: number, updateEventDto: UpdateEventDto): Promise<Event> {
-    // Tìm sự kiện hiện tại
+    // Chỉ cần gọi findOne để kiểm tra sự tồn tại và lấy dữ liệu cơ bản
+    await this.findOne(id);
+
+    // Lấy event cơ bản từ repository để update
     const event = await this.eventRepository.findOne({
       where: { event_id: id },
     });
 
     if (!event) {
       throw new NotFoundException(`Không tìm thấy sự kiện với id ${id}`);
-    }
-
-    // Xử lý court_id nếu là chuỗi
-    if (updateEventDto.court_id !== undefined) {
-      if (
-        updateEventDto.court_id === null ||
-        (typeof updateEventDto.court_id === 'string' &&
-          updateEventDto.court_id === '')
-      ) {
-        // Nếu là null hoặc chuỗi rỗng, đặt thành undefined
-        updateEventDto.court_id = undefined;
-      } else if (typeof updateEventDto.court_id === 'string') {
-        // Nếu là chuỗi, chuyển sang số
-        const courtIdNum = parseInt(updateEventDto.court_id);
-
-        // Kiểm tra xem có phải số hợp lệ không
-        if (isNaN(courtIdNum)) {
-          updateEventDto.court_id = undefined;
-        } else {
-          updateEventDto.court_id = courtIdNum;
-        }
-      }
     }
 
     // Xử lý xóa ảnh cũ nếu có ảnh mới
@@ -238,35 +189,6 @@ export class EventsService {
         throw new BadRequestException(
           'Thời gian kết thúc phải sau thời gian bắt đầu',
         );
-      }
-    }
-
-    // Cập nhật trạng thái tự động nếu không phải 'cancelled'
-    if (updateEventDto.status !== EventStatus.CANCELLED) {
-      // Sử dụng enum
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // Sử dụng ngày mới từ updateEventDto hoặc ngày hiện tại từ event nếu không có trong updateEventDto
-      const startDate = updateEventDto.start_date
-        ? new Date(updateEventDto.start_date)
-        : new Date(event.start_date);
-      startDate.setHours(0, 0, 0, 0);
-
-      const endDate = updateEventDto.end_date
-        ? new Date(updateEventDto.end_date)
-        : event.end_date
-          ? new Date(event.end_date)
-          : null;
-
-      if (endDate) endDate.setHours(0, 0, 0, 0);
-
-      if (startDate > today) {
-        updateEventDto.status = EventStatus.UPCOMING; // Sử dụng enum
-      } else if (!endDate || today <= endDate) {
-        updateEventDto.status = EventStatus.ONGOING; // Sử dụng enum
-      } else {
-        updateEventDto.status = EventStatus.COMPLETED; // Sử dụng enum
       }
     }
 
@@ -431,38 +353,5 @@ export class EventsService {
     // Cập nhật số lượng người tham gia
     event.current_participants = Math.max(0, event.current_participants - 1);
     await this.eventRepository.save(event);
-  }
-
-  // Chạy mỗi ngày lúc 00:01 sáng
-  @Cron('1 0 * * *')
-  async updateEventStatuses() {
-    this.logger.log('Đang cập nhật trạng thái sự kiện...');
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    try {
-      // Cập nhật sự kiện "upcoming" thành "ongoing" khi ngày bắt đầu <= ngày hiện tại
-      await this.eventRepository.update(
-        {
-          status: EventStatus.UPCOMING, // Sử dụng enum
-          start_date: LessThanOrEqual(today),
-        },
-        { status: EventStatus.ONGOING }, // Sử dụng enum
-      );
-
-      // Cập nhật sự kiện "ongoing" thành "completed" khi ngày kết thúc < ngày hiện tại
-      await this.eventRepository.update(
-        {
-          status: EventStatus.ONGOING, // Sử dụng enum
-          end_date: LessThanOrEqual(today),
-        },
-        { status: EventStatus.COMPLETED }, // Sử dụng enum
-      );
-
-      this.logger.log('Cập nhật trạng thái sự kiện thành công');
-    } catch (error) {
-      this.logger.error('Lỗi khi cập nhật trạng thái sự kiện:', error);
-    }
   }
 }
