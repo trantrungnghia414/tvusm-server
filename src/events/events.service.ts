@@ -27,16 +27,6 @@ export class EventsService {
     private participantRepository: Repository<EventParticipant>,
   ) {}
 
-  private transformToNumber(value: any): number {
-    if (value === undefined || value === null) return 1;
-    return value === true || value === 1 || value === '1' ? 1 : 0;
-  }
-
-  private transformToBoolean(value: any): boolean {
-    if (value === undefined || value === null) return true; // Mặc định là true
-    return value === true || value === 1 || value === '1';
-  }
-
   async create(createEventDto: CreateEventDto, userId: number): Promise<Event> {
     try {
       // Kiểm tra và đảm bảo userId là số
@@ -61,11 +51,12 @@ export class EventsService {
         : undefined;
 
       // Đặt giá trị mặc định cho is_public và is_featured
-      const eventData: Partial<Event> = {
+      const eventData = {
         ...createEventDto,
         organizer_id: organizerId,
-        is_public: this.transformToBoolean(createEventDto.is_public),
-        is_featured: this.transformToBoolean(createEventDto.is_featured),
+        // Giữ nguyên giá trị từ DTO
+        is_public: createEventDto.is_public ?? 1,
+        is_featured: createEventDto.is_featured ?? 1,
         start_date: startDate,
         end_date: endDate,
         status: createEventDto.status || EventStatus.UPCOMING,
@@ -78,21 +69,6 @@ export class EventsService {
       console.error('Error in create event service:', error);
       throw error;
     }
-  }
-
-  // Cập nhật phương thức convertToBoolean
-  private convertToBoolean(value: any): boolean {
-    if (typeof value === 'boolean') {
-      return value;
-    }
-    if (typeof value === 'string') {
-      const lowercased = value.toLowerCase();
-      return lowercased === 'true' || lowercased === '1';
-    }
-    if (typeof value === 'number') {
-      return value === 1;
-    }
-    return false;
   }
 
   async findAll(): Promise<EventWithExtras[]> {

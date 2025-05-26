@@ -3,9 +3,9 @@ import {
   IsString,
   IsEnum,
   IsOptional,
-  IsBoolean,
   IsNumber,
   IsPositive,
+  // IsBoolean,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { EventStatus, EventType } from '../entities/event.entity';
@@ -59,20 +59,24 @@ export class CreateEventDto {
   max_participants?: number;
 
   @IsOptional()
-  @IsBoolean()
   @Transform(({ value }) => {
-    if (value === undefined) return 1; // Mặc định là 1
-    return value === '1' || value === 1 || value === true ? 1 : 0;
+    if (typeof value === 'string') {
+      return value === '1' ? 1 : 0;
+    }
+    return value ? 1 : 0;
   })
-  is_public?: number = 1; // Mặc định là 1
+  @IsNumber()
+  is_public?: number;
 
   @IsOptional()
-  @IsBoolean()
   @Transform(({ value }) => {
-    if (value === undefined) return 1; // Mặc định là 1
-    return value === '1' || value === 1 || value === true ? 1 : 0;
+    if (typeof value === 'string') {
+      return value === '1' ? 1 : 0;
+    }
+    return value ? 1 : 0;
   })
-  is_featured?: number = 1; // Mặc định là 1
+  @IsNumber()
+  is_featured?: number;
 
   @IsOptional()
   @Type(() => Date)

@@ -94,11 +94,11 @@ export class Event {
   @Column({ nullable: true })
   image: string;
 
-  @Column({ default: true })
-  is_public: boolean;
+  @Column({ type: 'tinyint', default: 1 })
+  is_public: number;
 
-  @Column({ default: true })
-  is_featured: boolean;
+  @Column({ type: 'tinyint', default: 1 })
+  is_featured: number;
 
   @Column({ type: 'date', nullable: true })
   registration_deadline: Date;
