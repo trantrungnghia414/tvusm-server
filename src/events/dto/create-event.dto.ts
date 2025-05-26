@@ -7,7 +7,7 @@ import {
   IsNumber,
   IsPositive,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { EventStatus, EventType } from '../entities/event.entity';
 
 export class CreateEventDto {
@@ -60,11 +60,19 @@ export class CreateEventDto {
 
   @IsOptional()
   @IsBoolean()
-  is_public?: boolean;
+  @Transform(({ value }) => {
+    if (value === undefined) return 1; // Mặc định là 1
+    return value === '1' || value === 1 || value === true ? 1 : 0;
+  })
+  is_public?: number = 1; // Mặc định là 1
 
   @IsOptional()
   @IsBoolean()
-  is_featured?: boolean;
+  @Transform(({ value }) => {
+    if (value === undefined) return 1; // Mặc định là 1
+    return value === '1' || value === 1 || value === true ? 1 : 0;
+  })
+  is_featured?: number = 1; // Mặc định là 1
 
   @IsOptional()
   @Type(() => Date)

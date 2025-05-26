@@ -27,6 +27,16 @@ export class EventsService {
     private participantRepository: Repository<EventParticipant>,
   ) {}
 
+  private transformToNumber(value: any): number {
+    if (value === undefined || value === null) return 1;
+    return value === true || value === 1 || value === '1' ? 1 : 0;
+  }
+
+  private transformToBoolean(value: any): boolean {
+    if (value === undefined || value === null) return true; // Mặc định là true
+    return value === true || value === 1 || value === '1';
+  }
+
   async create(createEventDto: CreateEventDto, userId: number): Promise<Event> {
     try {
       // Kiểm tra và đảm bảo userId là số
@@ -34,7 +44,6 @@ export class EventsService {
         throw new BadRequestException('Invalid organizer_id');
       }
 
-      // Ép kiểu thành số
       const organizerId = Number(userId);
 
       // Kiểm tra ngày bắt đầu và kết thúc
@@ -45,77 +54,45 @@ export class EventsService {
         throw new BadRequestException('Ngày kết thúc phải sau ngày bắt đầu');
       }
 
-      // Xử lý các trường Boolean
-      if (typeof createEventDto.is_public === 'string') {
-        createEventDto.is_public = createEventDto.is_public === 'true';
-      }
-
-      if (typeof createEventDto.is_featured === 'string') {
-        createEventDto.is_featured = createEventDto.is_featured === 'true';
-      }
-
-      // Xử lý cẩn thận các trường số
-      if (
-        createEventDto.venue_id &&
-        typeof createEventDto.venue_id === 'string'
-      ) {
-        createEventDto.venue_id = parseInt(createEventDto.venue_id);
-      }
-
-      if (
-        createEventDto.court_id &&
-        typeof createEventDto.court_id === 'string'
-      ) {
-        createEventDto.court_id = parseInt(createEventDto.court_id);
-      }
-
-      if (
-        createEventDto.max_participants &&
-        typeof createEventDto.max_participants === 'string'
-      ) {
-        createEventDto.max_participants = parseInt(
-          createEventDto.max_participants,
-        );
-      }
-
-      // Xác định trạng thái tự động dựa trên thời gian
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Reset thời gian về 00:00:00
-
+      // Chuyển đổi các trường ngày tháng
       const startDate = new Date(createEventDto.start_date);
-      startDate.setHours(0, 0, 0, 0);
-
       const endDate = createEventDto.end_date
         ? new Date(createEventDto.end_date)
-        : null;
+        : undefined;
 
-      if (endDate) endDate.setHours(0, 0, 0, 0);
-
-      // Nếu người dùng muốn đặt trạng thái là cancelled, giữ nguyên
-      // Nếu không, tự động xác định dựa trên thời gian
-      if (createEventDto.status !== EventStatus.CANCELLED) {
-        // Sử dụng enum
-        if (startDate > today) {
-          createEventDto.status = EventStatus.UPCOMING; // Sử dụng enum
-        } else if (!endDate || today <= endDate) {
-          createEventDto.status = EventStatus.ONGOING; // Sử dụng enum
-        } else {
-          createEventDto.status = EventStatus.COMPLETED; // Sử dụng enum
-        }
-      }
-
-      // Tạo sự kiện mới với trạng thái đã xác định
-      const event = this.eventRepository.create({
+      // Đặt giá trị mặc định cho is_public và is_featured
+      const eventData: Partial<Event> = {
         ...createEventDto,
         organizer_id: organizerId,
-        // organizer_name đã được bao gồm trong createEventDto
-      });
+        is_public: this.transformToBoolean(createEventDto.is_public),
+        is_featured: this.transformToBoolean(createEventDto.is_featured),
+        start_date: startDate,
+        end_date: endDate,
+        status: createEventDto.status || EventStatus.UPCOMING,
+      };
 
-      return this.eventRepository.save(event);
+      // Tạo và lưu event
+      const event = this.eventRepository.create(eventData);
+      return await this.eventRepository.save(event);
     } catch (error) {
       console.error('Error in create event service:', error);
       throw error;
     }
+  }
+
+  // Cập nhật phương thức convertToBoolean
+  private convertToBoolean(value: any): boolean {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const lowercased = value.toLowerCase();
+      return lowercased === 'true' || lowercased === '1';
+    }
+    if (typeof value === 'number') {
+      return value === 1;
+    }
+    return false;
   }
 
   async findAll(): Promise<EventWithExtras[]> {
@@ -168,111 +145,32 @@ export class EventsService {
   }
 
   async update(id: number, updateEventDto: UpdateEventDto): Promise<Event> {
-    // Tìm sự kiện hiện tại
     const event = await this.eventRepository.findOne({
       where: { event_id: id },
     });
 
     if (!event) {
-      throw new NotFoundException(`Không tìm thấy sự kiện với id ${id}`);
+      throw new NotFoundException(`Event with ID ${id} not found`);
     }
 
-    // Xử lý court_id nếu là chuỗi
-    if (updateEventDto.court_id !== undefined) {
-      if (
-        updateEventDto.court_id === null ||
-        (typeof updateEventDto.court_id === 'string' &&
-          updateEventDto.court_id === '')
-      ) {
-        // Nếu là null hoặc chuỗi rỗng, đặt thành undefined
-        updateEventDto.court_id = undefined;
-      } else if (typeof updateEventDto.court_id === 'string') {
-        // Nếu là chuỗi, chuyển sang số
-        const courtIdNum = parseInt(updateEventDto.court_id);
+    // Tạo object mới để lưu các thay đổi
+    const updatedEventData = { ...updateEventDto };
 
-        // Kiểm tra xem có phải số hợp lệ không
-        if (isNaN(courtIdNum)) {
-          updateEventDto.court_id = undefined;
-        } else {
-          updateEventDto.court_id = courtIdNum;
-        }
-      }
+    // Chuyển đổi ngày tháng sang định dạng ISO string
+    if (updateEventDto.start_date) {
+      const startDate = new Date(updateEventDto.start_date);
+      updatedEventData.start_date = startDate.toISOString().split('T')[0];
     }
 
-    // Xử lý xóa ảnh cũ nếu có ảnh mới
-    if (
-      updateEventDto.image &&
-      event.image &&
-      updateEventDto.image !== event.image
-    ) {
-      try {
-        // Chỉ xóa khi ảnh hiện tại là file đã upload (không phải URL bên ngoài)
-        if (
-          !event.image.startsWith('http') &&
-          fs.existsSync(`.${event.image}`)
-        ) {
-          fs.unlinkSync(`.${event.image}`);
-          console.log(`Đã xóa ảnh cũ: ${event.image}`);
-        }
-      } catch (error) {
-        console.error('Lỗi khi xóa file ảnh cũ:', error);
-        // Tiếp tục cập nhật dù có lỗi khi xóa file
-      }
+    if (updateEventDto.end_date) {
+      const endDate = new Date(updateEventDto.end_date);
+      updatedEventData.end_date = endDate.toISOString().split('T')[0];
     }
 
-    // Kiểm tra ngày bắt đầu và kết thúc
-    if (
-      updateEventDto.end_date &&
-      new Date(updateEventDto.end_date) <
-        new Date(updateEventDto.start_date || event.start_date)
-    ) {
-      throw new BadRequestException('Ngày kết thúc phải sau ngày bắt đầu');
-    }
+    // Cập nhật các trường khác
+    Object.assign(event, updatedEventData);
 
-    // Kiểm tra thời gian bắt đầu và kết thúc
-    if (updateEventDto.start_time && updateEventDto.end_time) {
-      const startTime = new Date(`2000-01-01T${updateEventDto.start_time}`);
-      const endTime = new Date(`2000-01-01T${updateEventDto.end_time}`);
-
-      if (endTime <= startTime) {
-        throw new BadRequestException(
-          'Thời gian kết thúc phải sau thời gian bắt đầu',
-        );
-      }
-    }
-
-    // Cập nhật trạng thái tự động nếu không phải 'cancelled'
-    if (updateEventDto.status !== EventStatus.CANCELLED) {
-      // Sử dụng enum
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // Sử dụng ngày mới từ updateEventDto hoặc ngày hiện tại từ event nếu không có trong updateEventDto
-      const startDate = updateEventDto.start_date
-        ? new Date(updateEventDto.start_date)
-        : new Date(event.start_date);
-      startDate.setHours(0, 0, 0, 0);
-
-      const endDate = updateEventDto.end_date
-        ? new Date(updateEventDto.end_date)
-        : event.end_date
-          ? new Date(event.end_date)
-          : null;
-
-      if (endDate) endDate.setHours(0, 0, 0, 0);
-
-      if (startDate > today) {
-        updateEventDto.status = EventStatus.UPCOMING; // Sử dụng enum
-      } else if (!endDate || today <= endDate) {
-        updateEventDto.status = EventStatus.ONGOING; // Sử dụng enum
-      } else {
-        updateEventDto.status = EventStatus.COMPLETED; // Sử dụng enum
-      }
-    }
-
-    // Cập nhật sự kiện
-    const updatedEvent = this.eventRepository.merge(event, updateEventDto);
-    return this.eventRepository.save(updatedEvent);
+    return await this.eventRepository.save(event);
   }
 
   async remove(id: number): Promise<void> {
@@ -385,7 +283,7 @@ export class EventsService {
     participantId: number,
     updateDto: UpdateParticipantStatusDto,
   ): Promise<EventParticipant> {
-    await this.findOne(eventId); // Kiểm tra sự kiện có tồn tại không
+    await this.findOne(eventId); // Kiểm tra sự tồn tại sự kiện
 
     const participant = await this.participantRepository.findOne({
       where: { id: participantId, event_id: eventId },

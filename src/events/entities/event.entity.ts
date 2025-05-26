@@ -97,7 +97,7 @@ export class Event {
   @Column({ default: true })
   is_public: boolean;
 
-  @Column({ default: false })
+  @Column({ default: true })
   is_featured: boolean;
 
   @Column({ type: 'date', nullable: true })
