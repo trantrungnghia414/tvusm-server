@@ -29,6 +29,10 @@ import { EventsModule } from 'src/events/events.module';
 
 import { ScheduleModule } from '@nestjs/schedule';
 
+import { News } from 'src/news/entities/news.entity';
+import { NewsModule } from 'src/news/news.module';
+import { NewsCategory } from 'src/news/entities/news-category.entity';
+
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -47,6 +51,8 @@ import { ScheduleModule } from '@nestjs/schedule';
         CourtMapping,
         Event,
         EventParticipant,
+        News,
+        NewsCategory,
       ],
       synchronize: false, // Chỉ nên để true trong môi trường phát triển
     }),
@@ -58,6 +64,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     CourtModule,
     CourtMappingModule,
     EventsModule,
+    NewsModule,
     ConfigModule.forRoot({
       isGlobal: true, // Để biến môi trường có thể sử dụng ở bất kỳ đâu trong ứng dụng
     }),
