@@ -11,6 +11,9 @@ import { NewsCategory } from './entities/news-category.entity';
 import { CreateNewsDto } from './dto/create-news.dto';
 import { UpdateNewsDto } from './dto/update-news.dto';
 import { UpdateNewsStatusDto } from './dto/update-news-status.dto';
+import * as fs from 'fs';
+import { NewsViewService } from './news-view.service';
+import { Request } from 'express';
 
 @Injectable()
 export class NewsService {
@@ -19,6 +22,7 @@ export class NewsService {
     private newsRepository: Repository<News>,
     @InjectRepository(NewsCategory)
     private categoryRepository: Repository<NewsCategory>,
+    private newsViewService: NewsViewService,
   ) {}
 
   // Truy vấn danh sách tin tức với thông tin category và author
@@ -67,7 +71,7 @@ export class NewsService {
   }
 
   // Truy vấn tin tức chi tiết theo ID
-  async findOne(news_id: number) {
+  async findOne(news_id: number, req?: Request) {
     const news = await this.newsRepository
       .createQueryBuilder('news')
       .leftJoin('news.category', 'category')
@@ -86,17 +90,17 @@ export class NewsService {
       throw new NotFoundException('Không tìm thấy tin tức');
     }
 
-    // Đưa category_name và author_name vào kết quả trả về
+    // Tăng lượt xem nếu có request object
+    if (req) {
+      await this.newsViewService.incrementViewCount(news_id, req);
+    }
+
+    // Phần xử lý dữ liệu trả về vẫn giữ nguyên
     const category_name = news.category ? news.category.name : null;
     const author_name = news.author ? news.author.fullname : null;
     const author_username = news.author ? news.author.username : null;
     const author_avatar = news.author ? news.author.avatar : null;
 
-    // Tăng lượt xem
-    await this.newsRepository.increment({ news_id }, 'view_count', 1);
-
-    // Tạo đối tượng mới không chứa author và category đầy đủ
-    // Sửa: Bỏ qua biến category và author không dùng đến
     const { ...rest } = news;
     return {
       ...rest,
@@ -108,7 +112,7 @@ export class NewsService {
   }
 
   // Truy vấn tin tức theo slug
-  async findBySlug(slug: string) {
+  async findBySlug(slug: string, req?: Request) {
     const news = await this.newsRepository
       .createQueryBuilder('news')
       .leftJoin('news.category', 'category')
@@ -125,6 +129,11 @@ export class NewsService {
 
     if (!news) {
       throw new NotFoundException('Không tìm thấy tin tức');
+    }
+
+    // Tăng lượt xem nếu có request object
+    if (req) {
+      await this.newsViewService.incrementViewCount(news.news_id, req);
     }
 
     // Đưa category_name và author_name vào kết quả trả về
@@ -240,6 +249,23 @@ export class NewsService {
       publishedAt = new Date();
     }
 
+    // Nếu cập nhật ảnh mới và có ảnh cũ, xóa ảnh cũ
+    if (thumbnailPath && news.thumbnail) {
+      try {
+        // Chỉ xóa nếu ảnh hiện tại là upload file (không phải đường dẫn URL)
+        if (
+          !news.thumbnail.startsWith('http') &&
+          fs.existsSync(`.${news.thumbnail}`)
+        ) {
+          fs.unlinkSync(`.${news.thumbnail}`);
+          console.log(`Đã xóa ảnh cũ: ${news.thumbnail}`);
+        }
+      } catch (error) {
+        console.error('Lỗi khi xóa file ảnh cũ:', error);
+        // Vẫn tiếp tục cập nhật ngay cả khi xóa ảnh thất bại
+      }
+    }
+
     // Cập nhật thông tin tin tức
     await this.newsRepository.update(
       { news_id },
@@ -307,6 +333,20 @@ export class NewsService {
       throw new ForbiddenException(
         'Bạn không có quyền xóa tin tức của người khác',
       );
+    }
+
+    // Xóa ảnh thumbnail từ filesystem nếu có
+    if (news.thumbnail && !news.thumbnail.startsWith('http')) {
+      try {
+        const imagePath = `.${news.thumbnail}`;
+        if (fs.existsSync(imagePath)) {
+          fs.unlinkSync(imagePath);
+          console.log(`Đã xóa ảnh thumbnail: ${news.thumbnail}`);
+        }
+      } catch (error) {
+        console.error('Lỗi khi xóa file ảnh thumbnail:', error);
+        // Tiếp tục xóa tin tức ngay cả khi xóa file ảnh thất bại
+      }
     }
 
     // Thực hiện xóa tin tức

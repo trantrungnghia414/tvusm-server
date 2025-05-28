@@ -13,6 +13,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -29,6 +30,7 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { User } from 'src/user/entities/user.entity';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 // import { User } from '../users/entities/user.entity';
+import { Request } from 'express';
 
 @Controller('news')
 export class NewsController {
@@ -96,14 +98,14 @@ export class NewsController {
 
   // API lấy tin tức theo ID
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.newsService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+    return this.newsService.findOne(id, req);
   }
 
   // API lấy tin tức theo slug
   @Get('slug/:slug')
-  async findBySlug(@Param('slug') slug: string) {
-    return this.newsService.findBySlug(slug);
+  async findBySlug(@Param('slug') slug: string, @Req() req: Request) {
+    return this.newsService.findBySlug(slug, req);
   }
 
   // API tạo tin tức mới (cần đăng nhập)
