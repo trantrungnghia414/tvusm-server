@@ -452,4 +452,66 @@ export class NewsService {
       take: limit,
     });
   }
+
+  // Cập nhật danh mục tin tức
+  async updateCategory(
+    id: number,
+    name: string,
+    slug: string,
+    description?: string,
+  ) {
+    // Kiểm tra danh mục tồn tại
+    const category = await this.categoryRepository.findOneBy({
+      category_id: id,
+    });
+    if (!category) {
+      throw new NotFoundException('Danh mục không tồn tại');
+    }
+
+    // Kiểm tra xem slug mới có bị trùng không (nếu slug thay đổi)
+    if (slug !== category.slug) {
+      const slugExists = await this.categoryRepository.findOneBy({ slug });
+      if (slugExists) {
+        throw new BadRequestException(
+          'Slug đã tồn tại, vui lòng chọn slug khác',
+        );
+      }
+    }
+
+    // Cập nhật thông tin
+    category.name = name;
+    category.slug = slug;
+    if (description !== undefined) {
+      category.description = description;
+    }
+
+    // Lưu thay đổi
+    return this.categoryRepository.save(category);
+  }
+
+  // Xóa danh mục tin tức
+  async deleteCategory(id: number) {
+    // Kiểm tra danh mục tồn tại
+    const category = await this.categoryRepository.findOneBy({
+      category_id: id,
+    });
+    if (!category) {
+      throw new NotFoundException('Danh mục không tồn tại');
+    }
+
+    // Kiểm tra danh mục đang được sử dụng bởi tin tức nào không
+    const newsCount = await this.newsRepository.count({
+      where: { category_id: id },
+    });
+
+    if (newsCount > 0) {
+      throw new BadRequestException(
+        `Không thể xóa danh mục này vì nó đang được sử dụng bởi ${newsCount} tin tức. Vui lòng chuyển tin tức sang danh mục khác trước.`,
+      );
+    }
+
+    // Xóa danh mục
+    await this.categoryRepository.delete(id);
+    return { message: 'Xóa danh mục thành công' };
+  }
 }

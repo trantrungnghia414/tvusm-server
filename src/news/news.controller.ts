@@ -87,6 +87,30 @@ export class NewsController {
     );
   }
 
+  // API cập nhật danh mục tin tức (cần quyền admin)
+  @Patch('categories/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async updateCategory(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { name: string; slug: string; description?: string },
+  ) {
+    return this.newsService.updateCategory(
+      id,
+      body.name,
+      body.slug,
+      body.description,
+    );
+  }
+
+  // API xóa danh mục tin tức (cần quyền admin)
+  @Delete('categories/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async deleteCategory(@Param('id', ParseIntPipe) id: number) {
+    return this.newsService.deleteCategory(id);
+  }
+
   // API lấy tin tức theo danh mục
   @Get('categories/:id')
   async findByCategory(
