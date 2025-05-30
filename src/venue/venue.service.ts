@@ -1,16 +1,28 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  InternalServerErrorException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import * as fs from 'fs';
 import { Venue } from './entities/venue.entity';
 import { CreateVenueDto } from './dto/create-venue.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
+import * as fs from 'fs';
+import { DataSource } from 'typeorm';
+
+// Định nghĩa interface cho kết quả truy vấn count
+interface CountResult {
+  count: number;
+}
 
 @Injectable()
 export class VenueService {
   constructor(
     @InjectRepository(Venue)
     private venueRepository: Repository<Venue>,
+    private dataSource: DataSource, // Thêm DataSource để thực hiện raw query
   ) {}
 
   // Tạo nhà thi đấu mới
@@ -72,6 +84,42 @@ export class VenueService {
     try {
       const venue = await this.findOne(id);
 
+      // Kiểm tra xem nhà thi đấu có sân nào không
+      const courtsCount = await this.dataSource.query<CountResult[]>(
+        'SELECT COUNT(*) as count FROM courts WHERE venue_id = ?',
+        [id],
+      );
+
+      if (courtsCount[0].count > 0) {
+        throw new ConflictException(
+          `Không thể xóa nhà thi đấu này vì có ${courtsCount[0].count} sân thể thao đang liên kết với nó. Vui lòng xóa sân trước.`,
+        );
+      }
+
+      // Kiểm tra xem nhà thi đấu có sự kiện nào không
+      const eventsCount = await this.dataSource.query<CountResult[]>(
+        'SELECT COUNT(*) as count FROM events WHERE venue_id = ?',
+        [id],
+      );
+
+      if (eventsCount[0].count > 0) {
+        throw new ConflictException(
+          `Không thể xóa nhà thi đấu này vì có ${eventsCount[0].count} sự kiện đang liên kết với nó. Vui lòng xóa hoặc chuyển sự kiện sang nhà thi đấu khác trước.`,
+        );
+      }
+
+      // Kiểm tra xem nhà thi đấu có thiết bị nào không
+      const equipmentCount = await this.dataSource.query<CountResult[]>(
+        'SELECT COUNT(*) as count FROM equipment WHERE venue_id = ?',
+        [id],
+      );
+
+      if (equipmentCount[0].count > 0) {
+        throw new ConflictException(
+          `Không thể xóa nhà thi đấu này vì có ${equipmentCount[0].count} thiết bị đang liên kết với nó. Vui lòng chuyển thiết bị sang địa điểm khác trước.`,
+        );
+      }
+
       // Xóa file ảnh nếu có
       if (
         venue.image &&
@@ -86,11 +134,15 @@ export class VenueService {
         }
       }
 
-      // Sử dụng delete thay vì remove để không tải entities liên quan
+      // Xóa nhà thi đấu nếu không có dữ liệu liên quan
       await this.venueRepository.delete(id);
     } catch (error) {
+      if (error instanceof ConflictException) {
+        throw error;
+      }
+
       console.error('Lỗi khi xóa nhà thi đấu:', error);
-      throw new NotFoundException(
+      throw new InternalServerErrorException(
         `Không thể xóa nhà thi đấu với id ${id}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }

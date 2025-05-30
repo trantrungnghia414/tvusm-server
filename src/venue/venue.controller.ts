@@ -12,6 +12,9 @@ import {
   Request,
   ParseIntPipe,
   BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -146,7 +149,15 @@ export class VenueController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.venueService.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    try {
+      await this.venueService.remove(id);
+      return { message: 'Xóa nhà thi đấu thành công' };
+    } catch (error) {
+      if (error instanceof ConflictException) {
+        throw new HttpException(error.message, HttpStatus.CONFLICT);
+      }
+      throw error;
+    }
   }
 }
