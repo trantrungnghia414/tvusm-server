@@ -12,7 +12,6 @@ import {
   UploadedFile,
   BadRequestException,
   ParseIntPipe,
-  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -116,18 +115,8 @@ export class EventsController {
 
   // Lấy danh sách tất cả sự kiện (không cần xác thực)
   @Get()
-  async findAll(
-    @Query('venue_id') venueId?: number,
-    @Query('status') status?: string,
-  ) {
-    let statusList: string[] = [];
-
-    if (status) {
-      // Chuyển đổi 'completed,ongoing' thành mảng ['completed', 'ongoing']
-      statusList = status.split(',');
-    }
-
-    return this.eventsService.findAll(venueId, statusList);
+  findAll(): Promise<EventWithExtras[]> {
+    return this.eventsService.findAll();
   }
 
   // Lấy chi tiết một sự kiện (không cần xác thực)

@@ -71,29 +71,33 @@ export class EventsService {
     }
   }
 
-  async findAll(): Promise<EventWithExtras[]> {
+  async findAll(venueId?: number, statusList?: string[]): Promise<Event[]> {
     try {
-      const events = await this.eventRepository.find({
-        order: { start_date: 'DESC' },
-        relations: ['venue', 'court', 'organizer'],
-      });
+      const queryBuilder = this.eventRepository
+        .createQueryBuilder('event')
+        .leftJoinAndSelect('event.venue', 'venue')
+        .leftJoinAndSelect('event.court', 'court');
 
-      // Chuyển đổi dữ liệu để thêm các trường venue_name, court_name, organizer_name (nếu chưa có)
-      return events.map((event) => {
-        return {
-          ...event,
-          venue_name: event.venue?.name || null,
-          court_name: event.court?.name || null,
-          organizer_name:
-            event.organizer_name ||
-            event.organizer?.fullname ||
-            event.organizer?.username ||
-            null,
-        };
-      });
+      // Nếu có venueId, thêm điều kiện lọc theo nhà thi đấu
+      if (venueId) {
+        queryBuilder.andWhere('event.venue_id = :venueId', { venueId });
+      }
+
+      // Nếu có danh sách trạng thái, lọc theo các trạng thái đó
+      if (statusList && statusList.length > 0) {
+        queryBuilder.andWhere('event.status IN (:...statusList)', {
+          statusList,
+        });
+      }
+
+      // Sắp xếp theo ngày bắt đầu, mới nhất trước
+      queryBuilder.orderBy('event.start_date', 'DESC');
+
+      return await queryBuilder.getMany();
     } catch (error) {
-      console.error('Error in findAll events:', error);
-      throw new Error('Failed to fetch events');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error in findAll: ${message}`, error);
+      throw error;
     }
   }
 
