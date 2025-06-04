@@ -4,7 +4,9 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
+import { Booking } from '../../booking/entities/booking.entity';
 
 @Entity('users') //→ trỏ đúng tới tên bảng trong MySQL
 export class User {
@@ -67,4 +69,7 @@ export class User {
 
   @UpdateDateColumn({ type: 'timestamp' })
   updated_at: Date;
+
+  @OneToMany(() => Booking, (booking) => booking.user)
+  bookings: Booking[];
 }

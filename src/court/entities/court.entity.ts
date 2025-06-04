@@ -6,9 +6,11 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  OneToMany,
 } from 'typeorm';
 import { CourtType } from '../../court-type/entities/court-type.entity';
 import { Venue } from '../../venue/entities/venue.entity';
+import { Booking } from '../../booking/entities/booking.entity';
 
 @Entity('courts')
 export class Court {
@@ -59,4 +61,7 @@ export class Court {
 
   @UpdateDateColumn({ type: 'timestamp' })
   updated_at: Date;
+
+  @OneToMany(() => Booking, (booking) => booking.court)
+  bookings: Booking[];
 }

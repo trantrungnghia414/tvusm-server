@@ -36,6 +36,8 @@ import { NewsCategory } from 'src/news/entities/news-category.entity';
 import { Equipment } from 'src/equipment/entities/equipment.entity';
 import { EquipmentCategory } from 'src/equipment/entities/equipment-category.entity';
 import { EquipmentModule } from 'src/equipment/equipment.module';
+import { Booking } from 'src/booking/entities/booking.entity';
+import { BookingModule } from 'src/booking/booking.module';
 
 @Module({
   imports: [
@@ -59,6 +61,7 @@ import { EquipmentModule } from 'src/equipment/equipment.module';
         NewsCategory,
         Equipment,
         EquipmentCategory,
+        Booking,
       ],
       synchronize: false, // Chỉ nên để true trong môi trường phát triển
     }),
@@ -72,6 +75,7 @@ import { EquipmentModule } from 'src/equipment/equipment.module';
     EventsModule,
     NewsModule,
     EquipmentModule,
+    BookingModule,
     ConfigModule.forRoot({
       isGlobal: true, // Để biến môi trường có thể sử dụng ở bất kỳ đâu trong ứng dụng
     }),

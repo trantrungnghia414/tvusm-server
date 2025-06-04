@@ -25,9 +25,10 @@ export interface CourtResponse {
   image: string | null;
   is_indoor: boolean;
   created_at: Date;
-  updated_at: Date;
+  updated_at?: Date; // Đã thêm dấu ? để cho phép undefined
   venue_id: number;
   type_id: number;
   venue_name: string;
   type_name: string;
+  booking_count?: number; // Thêm trường booking_count
 }
