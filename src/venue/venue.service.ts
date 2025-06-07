@@ -35,7 +35,8 @@ export class VenueService {
   async findAll(): Promise<Venue[]> {
     return this.venueRepository.find({
       order: {
-        name: 'ASC',
+        // name: 'ASC', // Sắp xếp theo tên nhà thi đấu
+        created_at: 'DESC', // Sắp xếp theo ngày tạo mới nhất
       },
     });
   }
