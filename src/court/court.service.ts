@@ -97,7 +97,7 @@ export class CourtService {
         LEFT JOIN court_types t ON c.type_id = t.type_id
         LEFT JOIN bookings b ON c.court_id = b.court_id AND b.status IN ('confirmed', 'completed')
         GROUP BY c.court_id
-        ORDER BY c.name ASC
+        ORDER BY c.created_at DESC
       `)) as RawCourt[];
 
       return courts.map(
