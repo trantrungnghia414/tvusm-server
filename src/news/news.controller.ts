@@ -9,7 +9,6 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
-  // NotFoundException,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
@@ -21,7 +20,6 @@ import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-// import { GetUser } from '../auth/decorators/get-user.decorator';
 import { NewsService } from './news.service';
 import { CreateNewsDto } from './dto/create-news.dto';
 import { UpdateNewsDto } from './dto/update-news.dto';
@@ -29,7 +27,6 @@ import { UpdateNewsStatusDto } from './dto/update-news-status.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { User } from 'src/user/entities/user.entity';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
-// import { User } from '../users/entities/user.entity';
 import { Request } from 'express';
 
 @Controller('news')

@@ -254,7 +254,9 @@ export class BookingService {
   }
 
   // Thêm phương thức này vào class BookingService
-  async getStats(): Promise<BookingStatsDto> {
+  async getStats(): Promise<
+    BookingStatsDto & { venueCounts: Record<number, number> }
+  > {
     try {
       // Đếm tổng số đặt sân
       const totalBookings = await this.bookingRepository.count();
@@ -276,16 +278,49 @@ export class BookingService {
         where: { status: 'cancelled' },
       });
 
+      // Thêm code để lấy số lượng booking theo venue
+      const venueBookingsQuery = await this.bookingRepository
+        .createQueryBuilder('booking')
+        .innerJoin('booking.court', 'court')
+        .select('court.venue_id', 'venue_id')
+        .addSelect('COUNT(booking.booking_id)', 'count')
+        .where('booking.status IN (:...statuses)', {
+          statuses: ['confirmed', 'completed'],
+        })
+        .groupBy('court.venue_id')
+        .getRawMany();
+
+      // Định nghĩa interface cho kết quả từ raw query
+      interface VenueBookingCount {
+        venue_id: number;
+        count: string;
+      }
+
+      // Chuyển đổi kết quả thành object { venue_id: count }
+      const venueCounts: Record<number, number> = {};
+      (venueBookingsQuery as VenueBookingCount[]).forEach((item) => {
+        venueCounts[item.venue_id] = parseInt(item.count, 10);
+      });
+
       return {
         totalBookings,
         confirmedBookings,
         pendingBookings,
         completedBookings,
         cancelledBookings,
+        venueCounts,
       };
     } catch (error) {
       console.error('Error getting booking stats:', error);
-      return { totalBookings: 0 }; // Trả về giá trị mặc định nếu có lỗi
+      // Trả về giá trị mặc định đầy đủ các trường khi có lỗi
+      return {
+        totalBookings: 0,
+        confirmedBookings: 0,
+        pendingBookings: 0,
+        completedBookings: 0,
+        cancelledBookings: 0,
+        venueCounts: {},
+      };
     }
   }
 }
