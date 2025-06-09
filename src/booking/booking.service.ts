@@ -11,6 +11,7 @@ import { Court } from '../court/entities/court.entity';
 import { CourtMapping } from '../court-mapping/entities/court-mapping.entity';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
+import { BookingStatsDto } from './dto/stats.dto';
 
 @Injectable()
 export class BookingService {
@@ -250,5 +251,41 @@ export class BookingService {
     });
 
     return Array.from(relatedCourtIds);
+  }
+
+  // Thêm phương thức này vào class BookingService
+  async getStats(): Promise<BookingStatsDto> {
+    try {
+      // Đếm tổng số đặt sân
+      const totalBookings = await this.bookingRepository.count();
+
+      // Đếm số đặt sân theo từng trạng thái
+      const confirmedBookings = await this.bookingRepository.count({
+        where: { status: 'confirmed' },
+      });
+
+      const pendingBookings = await this.bookingRepository.count({
+        where: { status: 'pending' },
+      });
+
+      const completedBookings = await this.bookingRepository.count({
+        where: { status: 'completed' },
+      });
+
+      const cancelledBookings = await this.bookingRepository.count({
+        where: { status: 'cancelled' },
+      });
+
+      return {
+        totalBookings,
+        confirmedBookings,
+        pendingBookings,
+        completedBookings,
+        cancelledBookings,
+      };
+    } catch (error) {
+      console.error('Error getting booking stats:', error);
+      return { totalBookings: 0 }; // Trả về giá trị mặc định nếu có lỗi
+    }
   }
 }

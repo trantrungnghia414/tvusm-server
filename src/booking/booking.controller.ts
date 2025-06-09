@@ -22,6 +22,7 @@ import { RequestWithUser } from '../auth/interfaces/request-with-user.interface'
 import { UpdateBookingDto } from 'src/booking/dto/update-booking.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Booking } from './entities/booking.entity';
+import { BookingStatsDto } from './dto/stats.dto';
 
 @Controller('bookings')
 export class BookingController {
@@ -76,6 +77,13 @@ export class BookingController {
   @UseGuards(JwtAuthGuard)
   findMyBookings(@Request() req: RequestWithUser): Promise<Booking[]> {
     return this.bookingService.findBookingsByUserId(req.user.user_id); // Sửa từ userId thành user_id
+  }
+
+  // Lấy thống kê đặt sân (cho phép truy cập công khai)
+  @Get('stats')
+  @Public()
+  async getStats(): Promise<BookingStatsDto> {
+    return this.bookingService.getStats();
   }
 
   // Lấy tất cả đặt sân (chỉ admin và manager)
