@@ -76,7 +76,8 @@ export class EventsService {
       const queryBuilder = this.eventRepository
         .createQueryBuilder('event')
         .leftJoinAndSelect('event.venue', 'venue')
-        .leftJoinAndSelect('event.court', 'court');
+        .leftJoinAndSelect('event.court', 'court')
+        .select(['event', 'venue.venue_id', 'venue.name']);
 
       // Nếu có venueId, thêm điều kiện lọc theo nhà thi đấu
       if (venueId) {
@@ -90,10 +91,16 @@ export class EventsService {
         });
       }
 
+      const events = await queryBuilder.getMany();
+
       // Sắp xếp theo ngày bắt đầu, mới nhất trước
       queryBuilder.orderBy('event.start_date', 'DESC');
 
-      return await queryBuilder.getMany();
+      // return await queryBuilder.getMany();
+      return events.map((event) => ({
+        ...event,
+        venue_name: event.venue?.name || null,
+      }));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error in findAll: ${message}`, error);
