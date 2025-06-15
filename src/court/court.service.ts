@@ -130,46 +130,70 @@ export class CourtService {
 
   async findOne(id: number): Promise<CourtResponse> {
     try {
-      const court = await this.courtRepository
-        .createQueryBuilder('court')
-        .leftJoinAndSelect('court.venue', 'venue')
-        .leftJoinAndSelect('court.type', 'type')
-        .where('court.court_id = :id', { id })
-        .select([
-          'court.*',
-          'venue.name AS venue_name',
-          'type.name AS type_name',
-        ])
-        .getRawOne<CourtQueryResult>();
+      // Sử dụng kiểu đã định nghĩa cho kết quả truy vấn
+      const courts = (await this.courtRepository.query(
+        `
+        SELECT c.*, v.name as venue_name, t.name as type_name, 
+               COUNT(b.booking_id) as booking_count
+        FROM courts c
+        LEFT JOIN venues v ON c.venue_id = v.venue_id
+        LEFT JOIN court_types t ON c.type_id = t.type_id
+        LEFT JOIN bookings b ON c.court_id = b.court_id AND b.status IN ('confirmed', 'completed')
+        WHERE c.court_id = ?
+        GROUP BY c.court_id
+      `,
+        [id],
+      )) as CourtQueryResult[];
 
-      if (!court) {
+      if (courts.length === 0) {
         throw new NotFoundException(`Không tìm thấy sân với id ${id}`);
       }
 
+      // Sử dụng kết quả đã có kiểu cụ thể
+      const court = courts[0];
+      const name = court.name;
+      const code = court.code;
+      const description = court.description;
+      const hourlyRate = Number(court.hourly_rate);
+      const status = court.status;
+      const image = court.image;
+      const isIndoor = Boolean(court.is_indoor);
+      const createdAt = new Date(court.created_at);
+      const updatedAt = court.updated_at
+        ? new Date(court.updated_at)
+        : undefined;
+      const venueId = court.venue_id;
+      const typeId = court.type_id;
+      const venueName = court.venue_name;
+      const typeName = court.type_name;
+      const bookingCount = parseInt(String(court.booking_count || '0'), 10);
+
       return {
-        court_id: court.court_id,
-        name: court.name,
-        code: court.code,
-        hourly_rate: court.hourly_rate,
-        description: court.description,
-        status: court.status,
-        image: court.image,
-        is_indoor: court.is_indoor,
-        created_at: court.created_at,
-        updated_at: court.updated_at,
-        venue_id: court.venue_id,
-        type_id: court.type_id,
-        venue_name: court.venue_name,
-        type_name: court.type_name,
+        court_id: id,
+        name,
+        code,
+        description,
+        hourly_rate: hourlyRate,
+        status,
+        image,
+        is_indoor: isIndoor,
+        created_at: createdAt,
+        updated_at: updatedAt,
+        venue_id: venueId,
+        type_id: typeId,
+        venue_name: venueName,
+        type_name: typeName,
+        booking_count: bookingCount,
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
       }
+
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       throw new InternalServerErrorException(
-        `Không thể tìm sân: ${errorMessage}`,
+        `Không thể lấy thông tin sân với id ${id}: ${errorMessage}`,
       );
     }
   }

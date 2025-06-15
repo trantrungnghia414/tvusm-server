@@ -13,6 +13,7 @@ export interface CourtQueryResult {
   updated_at: Date;
   venue_name: string;
   type_name: string;
+  booking_count: string | number;
 }
 
 export interface CourtResponse {
