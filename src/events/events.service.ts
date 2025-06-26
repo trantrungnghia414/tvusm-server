@@ -6,8 +6,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual } from 'typeorm';
-import { Event, EventStatus } from './entities/event.entity'; // Đảm bảo import EventStatus
+import { Event, EventStatus } from './entities/event.entity';
 import { EventParticipant } from './entities/event-participant.entity';
+import { User } from '../user/entities/user.entity';
+import { NotificationService } from '../notification/notification.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { CreateParticipantDto } from './dto/create-participant.dto';
@@ -25,6 +27,9 @@ export class EventsService {
     private eventRepository: Repository<Event>,
     @InjectRepository(EventParticipant)
     private participantRepository: Repository<EventParticipant>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async create(createEventDto: CreateEventDto, userId: number): Promise<Event> {
@@ -64,9 +69,34 @@ export class EventsService {
 
       // Tạo và lưu event
       const event = this.eventRepository.create(eventData);
-      return await this.eventRepository.save(event);
+      const savedEvent = await this.eventRepository.save(event);
+
+      // ✅ Thông báo cho tất cả users về sự kiện mới (nếu is_public)
+      if (savedEvent.is_public) {
+        const users = await this.userRepository.find({
+          where: { status: 'active' },
+          select: ['user_id'],
+        });
+
+        const userIds = users.map((user) => user.user_id);
+
+        if (userIds.length > 0) {
+          await this.notificationService.createEventNotification(
+            userIds,
+            savedEvent.event_id,
+            'created',
+            savedEvent.title,
+          );
+
+          console.log(
+            `🎉 Sent event creation notification to ${userIds.length} users`,
+          );
+        }
+      }
+
+      return savedEvent;
     } catch (error) {
-      console.error('Error in create event service:', error);
+      console.error('❌ Error creating event:', error);
       throw error;
     }
   }
@@ -96,7 +126,6 @@ export class EventsService {
       // Sắp xếp theo ngày bắt đầu, mới nhất trước
       queryBuilder.orderBy('event.start_date', 'DESC');
 
-      // return await queryBuilder.getMany();
       return events.map((event) => ({
         ...event,
         venue_name: event.venue?.name || null,
@@ -157,7 +186,35 @@ export class EventsService {
     // Cập nhật các trường khác
     Object.assign(event, updatedEventData);
 
-    return await this.eventRepository.save(event);
+    // Lưu event trước khi gửi notification
+    const savedEvent = await this.eventRepository.save(event);
+
+    // ✅ Sửa lỗi: Thông báo cho participants về update với title safety check
+    const participants = await this.participantRepository.find({
+      where: { event_id: id },
+      select: ['user_id'],
+    });
+
+    const userIds = participants.map((p) => p.user_id);
+
+    if (userIds.length > 0) {
+      // ✅ Sử dụng title từ saved event thay vì updatedEventData
+      const eventTitle =
+        updatedEventData.title || savedEvent.title || 'Sự kiện';
+
+      await this.notificationService.createEventNotification(
+        userIds,
+        id,
+        'updated',
+        eventTitle,
+      );
+
+      console.log(
+        `📝 Sent event update notification to ${userIds.length} participants`,
+      );
+    }
+
+    return savedEvent;
   }
 
   async remove(id: number): Promise<void> {
@@ -186,13 +243,31 @@ export class EventsService {
       }
     }
 
+    // ✅ Thông báo cho participants về hủy sự kiện
+    const participants = await this.participantRepository.find({
+      where: { event_id: id },
+      select: ['user_id'],
+    });
+
+    const userIds = participants.map((p) => p.user_id);
+
+    if (userIds.length > 0) {
+      await this.notificationService.createEventNotification(
+        userIds,
+        id,
+        'cancelled',
+        event.title,
+      );
+
+      console.log(
+        `❌ Sent event cancellation notification to ${userIds.length} participants`,
+      );
+    }
+
     await this.eventRepository.remove(event);
   }
 
   async updateStatus(id: number, status: EventStatus): Promise<Event> {
-    // Chỉ cần gọi findOne để kiểm tra sự tồn tại
-    await this.findOne(id);
-
     const event = await this.eventRepository.findOne({
       where: { event_id: id },
     });
@@ -201,8 +276,37 @@ export class EventsService {
       throw new NotFoundException(`Không tìm thấy sự kiện với id ${id}`);
     }
 
+    const oldStatus = event.status;
     event.status = status;
-    return this.eventRepository.save(event);
+    const updatedEvent = await this.eventRepository.save(event);
+
+    // ✅ Thông báo cho participants về thay đổi trạng thái
+    if (
+      status === EventStatus.CANCELLED &&
+      oldStatus !== EventStatus.CANCELLED
+    ) {
+      const participants = await this.participantRepository.find({
+        where: { event_id: id },
+        select: ['user_id'],
+      });
+
+      const userIds = participants.map((p) => p.user_id);
+
+      if (userIds.length > 0) {
+        await this.notificationService.createEventNotification(
+          userIds,
+          id,
+          'cancelled',
+          event.title,
+        );
+
+        console.log(
+          `❌ Sent event status change notification to ${userIds.length} participants`,
+        );
+      }
+    }
+
+    return updatedEvent;
   }
 
   // Quản lý người tham gia
@@ -330,19 +434,19 @@ export class EventsService {
       // Cập nhật sự kiện "upcoming" thành "ongoing" khi ngày bắt đầu <= ngày hiện tại
       await this.eventRepository.update(
         {
-          status: EventStatus.UPCOMING, // Sử dụng enum
+          status: EventStatus.UPCOMING,
           start_date: LessThanOrEqual(today),
         },
-        { status: EventStatus.ONGOING }, // Sử dụng enum
+        { status: EventStatus.ONGOING },
       );
 
       // Cập nhật sự kiện "ongoing" thành "completed" khi ngày kết thúc < ngày hiện tại
       await this.eventRepository.update(
         {
-          status: EventStatus.ONGOING, // Sử dụng enum
+          status: EventStatus.ONGOING,
           end_date: LessThanOrEqual(today),
         },
-        { status: EventStatus.COMPLETED }, // Sử dụng enum
+        { status: EventStatus.COMPLETED },
       );
 
       this.logger.log('Cập nhật trạng thái sự kiện thành công');

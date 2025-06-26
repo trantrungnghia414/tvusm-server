@@ -6,12 +6,17 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, FindManyOptions, FindOptionsWhere } from 'typeorm';
-import { Booking } from './entities/booking.entity';
+import {
+  Booking,
+  BookingStatus,
+  PaymentStatus,
+} from './entities/booking.entity';
 import { Court } from '../court/entities/court.entity';
 import { CourtMapping } from '../court-mapping/entities/court-mapping.entity';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { BookingStatsDto } from './dto/stats.dto';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class BookingService {
@@ -22,9 +27,13 @@ export class BookingService {
     private courtRepository: Repository<Court>,
     @InjectRepository(CourtMapping)
     private courtMappingRepository: Repository<CourtMapping>,
+    private readonly notificationService: NotificationService,
   ) {}
 
-  async create(createBookingDto: CreateBookingDto): Promise<Booking> {
+  async create(
+    createBookingDto: CreateBookingDto,
+    userId: number | null, // ✅ Allow null for guest bookings
+  ): Promise<Booking> {
     try {
       // Kiểm tra sân có tồn tại
       const court = await this.courtRepository.findOne({
@@ -71,20 +80,43 @@ export class BookingService {
       const duration = endHour - startHour;
       const totalAmount = court.hourly_rate * duration;
 
-      // Tạo đơn đặt sân mới
-      const newBooking = this.bookingRepository.create({
+      // ✅ Tạo booking data với user_id có thể null
+      const bookingData = {
         ...createBookingDto,
-        booking_date: createBookingDto.date, // Đảm bảo có cả booking_date và date
+        user_id: userId, // ✅ Có thể null cho guest booking
+        booking_date: createBookingDto.date,
         date: createBookingDto.date,
-        total_amount: totalAmount, // Sử dụng total_amount thay vì total_price
-        status: 'confirmed', // Mặc định là confirmed
-        booking_code: `BK${Math.floor(Math.random() * 1000000)}`, // Thêm booking_code bắt buộc
-        booking_type: 'public', // Thêm booking_type bắt buộc
-        payment_status: 'unpaid', // Thêm payment_status mặc định
-      });
+        total_amount: totalAmount,
+        status: BookingStatus.CONFIRMED,
+        booking_code: `BK${Date.now()}${Math.floor(Math.random() * 1000)}`,
+        booking_type: 'public',
+        payment_status: PaymentStatus.UNPAID,
+      };
 
-      // Lưu vào cơ sở dữ liệu
-      return await this.bookingRepository.save(newBooking);
+      // ✅ Tạo và lưu booking
+      const newBooking = this.bookingRepository.create(bookingData);
+      const savedBooking = await this.bookingRepository.save(newBooking);
+
+      // ✅ Chỉ tạo thông báo nếu có userId (user đã đăng nhập)
+      if (userId) {
+        try {
+          await this.notificationService.createBookingNotification(
+            userId,
+            savedBooking.booking_id,
+            'created',
+            savedBooking.booking_code,
+          );
+
+          console.log(`📅 Created booking notification for user ${userId}`);
+        } catch (notificationError) {
+          // Log lỗi notification nhưng không throw để không ảnh hưởng booking
+          console.error('❌ Error creating notification:', notificationError);
+        }
+      } else {
+        console.log('📅 Guest booking created - no notification sent');
+      }
+
+      return savedBooking;
     } catch (error) {
       // Xử lý lỗi
       if (
@@ -97,6 +129,59 @@ export class BookingService {
       throw new BadRequestException(
         `Không thể tạo đặt sân: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`,
       );
+    }
+  }
+
+  // ✅ Cập nhật updateStatus method để handle null user_id
+  async updateStatus(bookingId: number, status: BookingStatus) {
+    try {
+      const booking = await this.bookingRepository.findOne({
+        where: { booking_id: bookingId },
+      });
+
+      if (!booking) {
+        throw new NotFoundException('Booking not found');
+      }
+
+      booking.status = status;
+      const updatedBooking = await this.bookingRepository.save(booking);
+
+      // ✅ Chỉ tạo thông báo nếu có user_id
+      if (booking.user_id) {
+        try {
+          if (status === BookingStatus.CONFIRMED) {
+            await this.notificationService.createBookingNotification(
+              booking.user_id,
+              bookingId,
+              'confirmed',
+              booking.booking_code,
+            );
+            console.log(
+              `✅ Sent confirmation notification for booking ${booking.booking_code}`,
+            );
+          } else if (status === BookingStatus.CANCELLED) {
+            await this.notificationService.createBookingNotification(
+              booking.user_id,
+              bookingId,
+              'cancelled',
+              booking.booking_code,
+            );
+            console.log(
+              `❌ Sent cancellation notification for booking ${booking.booking_code}`,
+            );
+          }
+        } catch (notificationError) {
+          console.error(
+            '❌ Error creating status notification:',
+            notificationError,
+          );
+        }
+      }
+
+      return updatedBooking;
+    } catch (error) {
+      console.error('❌ Error updating booking status:', error);
+      throw error;
     }
   }
 
@@ -113,9 +198,12 @@ export class BookingService {
     // Khởi tạo đối tượng where nếu có điều kiện
     const whereClause: FindOptionsWhere<Booking> = {};
 
-    // Thêm các điều kiện tìm kiếm nếu có
+    // ✅ Sửa lỗi: Convert string status to enum
     if (status) {
-      whereClause.status = status;
+      const bookingStatus = this.mapStringToBookingStatus(status);
+      if (bookingStatus) {
+        whereClause.status = bookingStatus;
+      }
     }
 
     if (date) {
@@ -161,9 +249,9 @@ export class BookingService {
   ): Promise<Booking> {
     const booking = await this.findOne(id);
 
-    // Không cho phép thay đổi sân, ngày và giờ của booking đã xác nhận
+    // ✅ Sử dụng enum để so sánh
     if (
-      booking.status !== 'pending' &&
+      booking.status !== BookingStatus.PENDING &&
       (updateBookingDto.court_id ||
         updateBookingDto.date ||
         updateBookingDto.start_time ||
@@ -174,20 +262,20 @@ export class BookingService {
       );
     }
 
-    // Cập nhật thông tin
-    const updatedBooking = { ...booking, ...updateBookingDto };
-    return this.bookingRepository.save(updatedBooking);
+    // ✅ Cập nhật thông tin đúng cách
+    Object.assign(booking, updateBookingDto);
+    return await this.bookingRepository.save(booking);
   }
 
   async cancel(id: number): Promise<Booking> {
     const booking = await this.findOne(id);
 
-    // Kiểm tra nếu đặt sân đã kết thúc thì không thể hủy
-    if (booking.status === 'completed') {
+    // ✅ Sử dụng enum để so sánh
+    if (booking.status === BookingStatus.COMPLETED) {
       throw new BadRequestException('Không thể hủy đặt sân đã hoàn thành');
     }
 
-    booking.status = 'cancelled';
+    booking.status = BookingStatus.CANCELLED;
     return this.bookingRepository.save(booking);
   }
 
@@ -201,16 +289,12 @@ export class BookingService {
     // Lấy danh sách court ID liên quan (sân cha/con nếu có)
     const relatedCourtIds = await this.getRelatedCourts(courtId);
 
-    // Kiểm tra có đơn đặt sân nào trong các sân liên quan có thời gian trùng không
+    // ✅ Sử dụng enum cho status filter
     const existingBookings = await this.bookingRepository.find({
       where: {
         court_id: In(relatedCourtIds),
         date: date,
-        status: In(['confirmed', 'pending']),
-        // Một trong các điều kiện sau đây sẽ gây xung đột:
-        // 1. StartTime của booking mới nằm trong khoảng thời gian của booking cũ
-        // 2. EndTime của booking mới nằm trong khoảng thời gian của booking cũ
-        // 3. Booking mới bao trọn booking cũ
+        status: In([BookingStatus.CONFIRMED, BookingStatus.PENDING]),
       },
     });
 
@@ -261,21 +345,21 @@ export class BookingService {
       // Đếm tổng số đặt sân
       const totalBookings = await this.bookingRepository.count();
 
-      // Đếm số đặt sân theo từng trạng thái
+      // ✅ Sử dụng enum cho status queries
       const confirmedBookings = await this.bookingRepository.count({
-        where: { status: 'confirmed' },
+        where: { status: BookingStatus.CONFIRMED },
       });
 
       const pendingBookings = await this.bookingRepository.count({
-        where: { status: 'pending' },
+        where: { status: BookingStatus.PENDING },
       });
 
       const completedBookings = await this.bookingRepository.count({
-        where: { status: 'completed' },
+        where: { status: BookingStatus.COMPLETED },
       });
 
       const cancelledBookings = await this.bookingRepository.count({
-        where: { status: 'cancelled' },
+        where: { status: BookingStatus.CANCELLED },
       });
 
       // Thêm code để lấy số lượng booking theo venue
@@ -285,7 +369,7 @@ export class BookingService {
         .select('court.venue_id', 'venue_id')
         .addSelect('COUNT(booking.booking_id)', 'count')
         .where('booking.status IN (:...statuses)', {
-          statuses: ['confirmed', 'completed'],
+          statuses: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED],
         })
         .groupBy('court.venue_id')
         .getRawMany();
@@ -322,5 +406,31 @@ export class BookingService {
         venueCounts: {},
       };
     }
+  }
+
+  // ✅ Helper method để convert string to BookingStatus enum
+  private mapStringToBookingStatus(status: string): BookingStatus | null {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return BookingStatus.PENDING;
+      case 'confirmed':
+        return BookingStatus.CONFIRMED;
+      case 'completed':
+        return BookingStatus.COMPLETED;
+      case 'cancelled':
+        return BookingStatus.CANCELLED;
+      default:
+        return null;
+    }
+  }
+
+  // ✅ Method để convert BookingStatus enum to string (nếu cần)
+  public getBookingStatusString(status: BookingStatus): string {
+    return status.toString();
+  }
+
+  // ✅ Method để validate BookingStatus
+  public isValidBookingStatus(status: string): boolean {
+    return Object.values(BookingStatus).includes(status as BookingStatus);
   }
 }

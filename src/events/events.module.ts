@@ -4,11 +4,15 @@ import { EventsService } from './events.service';
 import { EventsController } from './events.controller';
 import { Event } from './entities/event.entity';
 import { EventParticipant } from './entities/event-participant.entity';
+import { User } from '../user/entities/user.entity';
+import { Booking } from '../booking/entities/booking.entity';
 import { MulterModule } from '@nestjs/platform-express';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Event, EventParticipant]),
+    TypeOrmModule.forFeature([Event, EventParticipant, User, Booking]),
+    NotificationModule,
     MulterModule.register({
       dest: './uploads/events',
     }),
