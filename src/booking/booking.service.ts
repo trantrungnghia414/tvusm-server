@@ -32,9 +32,12 @@ export class BookingService {
 
   async create(
     createBookingDto: CreateBookingDto,
-    userId: number | null, // ✅ Allow null for guest bookings
+    userId: number | null,
   ): Promise<Booking> {
     try {
+      console.log('🔄 Creating booking with userId:', userId);
+      console.log('📝 Booking data:', createBookingDto);
+
       // Kiểm tra sân có tồn tại
       const court = await this.courtRepository.findOne({
         where: { court_id: createBookingDto.court_id },
@@ -80,12 +83,21 @@ export class BookingService {
       const duration = endHour - startHour;
       const totalAmount = court.hourly_rate * duration;
 
-      // ✅ Tạo booking data với user_id có thể null
+      // ✅ Chuẩn bị booking data với user_id có thể null
       const bookingData = {
-        ...createBookingDto,
-        user_id: userId, // ✅ Có thể null cho guest booking
-        booking_date: createBookingDto.date,
+        court_id: createBookingDto.court_id,
+        user_id: userId, // ✅ Có thể là null cho guest booking
         date: createBookingDto.date,
+        booking_date: createBookingDto.date,
+        start_time: createBookingDto.start_time,
+        end_time: createBookingDto.end_time,
+        renter_name: createBookingDto.renter_name,
+        renter_phone: createBookingDto.renter_phone,
+        renter_email:
+          createBookingDto.renter_email && createBookingDto.renter_email.trim()
+            ? createBookingDto.renter_email.trim()
+            : null,
+        notes: createBookingDto.notes || null,
         total_amount: totalAmount,
         status: BookingStatus.CONFIRMED,
         booking_code: `BK${Date.now()}${Math.floor(Math.random() * 1000)}`,
@@ -93,11 +105,15 @@ export class BookingService {
         payment_status: PaymentStatus.UNPAID,
       };
 
-      // ✅ Tạo và lưu booking
+      console.log('💾 Saving booking data:', bookingData);
+
+      // Tạo và lưu booking
       const newBooking = this.bookingRepository.create(bookingData);
       const savedBooking = await this.bookingRepository.save(newBooking);
 
-      // ✅ Chỉ tạo thông báo nếu có userId (user đã đăng nhập)
+      console.log('✅ Booking saved successfully:', savedBooking.booking_id);
+
+      // Chỉ tạo thông báo nếu có userId (user đã đăng nhập)
       if (userId) {
         try {
           await this.notificationService.createBookingNotification(
@@ -106,11 +122,10 @@ export class BookingService {
             'created',
             savedBooking.booking_code,
           );
-
           console.log(`📅 Created booking notification for user ${userId}`);
         } catch (notificationError) {
-          // Log lỗi notification nhưng không throw để không ảnh hưởng booking
           console.error('❌ Error creating notification:', notificationError);
+          // Không throw error nếu notification fail
         }
       } else {
         console.log('📅 Guest booking created - no notification sent');
@@ -118,7 +133,8 @@ export class BookingService {
 
       return savedBooking;
     } catch (error) {
-      // Xử lý lỗi
+      console.error('❌ Error creating booking:', error);
+
       if (
         error instanceof NotFoundException ||
         error instanceof BadRequestException ||
@@ -126,6 +142,7 @@ export class BookingService {
       ) {
         throw error;
       }
+
       throw new BadRequestException(
         `Không thể tạo đặt sân: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`,
       );

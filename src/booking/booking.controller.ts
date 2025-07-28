@@ -47,29 +47,34 @@ export class BookingController {
       // ✅ Xử lý user_id logic đúng cách
       let userId: number | null = null;
 
-      // Nếu người dùng đã đăng nhập, lấy user_id từ token
+      // Nếu có token và user đã đăng nhập
       if (req.user && req.user.user_id) {
         userId = req.user.user_id;
+        console.log('✅ Logged in user booking:', userId);
+      } else {
+        console.log('✅ Guest booking - no user_id');
       }
 
-      // Nếu không có user từ token, lấy từ DTO (guest booking)
-      if (!userId && createBookingDto.user_id) {
-        userId = createBookingDto.user_id;
-      }
-
-      // ✅ Gọi service với userId được xử lý đúng
+      // ✅ Gọi service với userId (có thể là null cho guest)
       const booking = await this.bookingService.create(
         createBookingDto,
         userId,
       );
 
-      return booking;
+      return {
+        message: 'Đặt sân thành công',
+        booking,
+      };
     } catch (error) {
+      console.error('❌ Error in booking controller:', error);
+
       if (error instanceof HttpException) {
         throw error;
       }
+
       const errorMessage =
         error instanceof Error ? error.message : 'Có lỗi xảy ra khi đặt sân';
+
       throw new HttpException(errorMessage, HttpStatus.BAD_REQUEST);
     }
   }

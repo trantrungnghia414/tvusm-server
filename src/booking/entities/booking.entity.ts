@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Court } from '../../court/entities/court.entity';
+import { User } from '../../user/entities/user.entity';
 
 export enum BookingStatus {
   PENDING = 'pending',
@@ -30,7 +31,8 @@ export class Booking {
   @Column()
   court_id: number;
 
-  @Column({ type: 'int', nullable: true })
+  // ✅ Đảm bảo user_id có thể null
+  @Column({ type: 'int', nullable: true, default: null })
   user_id: number | null;
 
   @Column({ type: 'date' })
@@ -62,19 +64,19 @@ export class Booking {
   })
   payment_status: PaymentStatus;
 
-  @Column({ length: 255 })
+  @Column({ type: 'varchar', length: 255 })
   renter_name: string;
 
-  @Column({ length: 255 })
-  renter_email: string;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  renter_email: string | null;
 
-  @Column({ length: 20 })
+  @Column({ type: 'varchar', length: 20 })
   renter_phone: string;
 
   @Column({ type: 'text', nullable: true })
   notes: string | null;
 
-  @Column({ length: 50, unique: true })
+  @Column({ type: 'varchar', length: 50, unique: true })
   booking_code: string;
 
   @Column({
@@ -84,13 +86,19 @@ export class Booking {
   })
   booking_type: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'datetime' })
   updated_at: Date;
 
+  // Relations
   @ManyToOne(() => Court, (court) => court.court_id, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'court_id' })
   court: Court;
+
+  // ✅ Relation với User - nullable
+  @ManyToOne(() => User, (user) => user.bookings, { nullable: true })
+  @JoinColumn({ name: 'user_id' })
+  user: User | null;
 }

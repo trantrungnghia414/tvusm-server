@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsOptional, IsString, IsNumber } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsNumber,
+  IsEmail,
+} from 'class-validator';
 
 export class CreateBookingDto {
   @IsNotEmpty({ message: 'Vui lòng chọn sân' })
@@ -25,9 +31,11 @@ export class CreateBookingDto {
   @IsString()
   renter_name: string;
 
-  @IsNotEmpty({ message: 'Vui lòng nhập email' })
+  // ✅ Thay đổi email thành optional
+  @IsOptional()
+  @IsEmail({}, { message: 'Vui lòng nhập email hợp lệ' })
   @IsString()
-  renter_email: string;
+  renter_email?: string;
 
   @IsNotEmpty({ message: 'Vui lòng nhập số điện thoại' })
   @IsString()
@@ -37,7 +45,6 @@ export class CreateBookingDto {
   @IsString()
   notes?: string;
 
-  // Trường payment_method không có trong DB nên đánh dấu là tùy chọn
   @IsOptional()
   @IsString()
   payment_method?: string;
