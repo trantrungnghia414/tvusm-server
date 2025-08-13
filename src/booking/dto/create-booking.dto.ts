@@ -11,10 +11,6 @@ export class CreateBookingDto {
   @IsNumber()
   court_id: number;
 
-  @IsOptional()
-  @IsNumber()
-  user_id?: number;
-
   @IsNotEmpty({ message: 'Vui lòng chọn ngày' })
   @IsString()
   date: string;
@@ -31,7 +27,7 @@ export class CreateBookingDto {
   @IsString()
   renter_name: string;
 
-  // ✅ Thay đổi email thành optional
+  // ✅ Email là optional
   @IsOptional()
   @IsEmail({}, { message: 'Vui lòng nhập email hợp lệ' })
   @IsString()

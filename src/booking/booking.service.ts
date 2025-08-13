@@ -30,13 +30,19 @@ export class BookingService {
     private readonly notificationService: NotificationService,
   ) {}
 
+  // ✅ Cập nhật method create để user_id bắt buộc
   async create(
     createBookingDto: CreateBookingDto,
-    userId: number | null,
+    userId: number, // ✅ Bỏ null, chỉ nhận number
   ): Promise<Booking> {
     try {
       console.log('🔄 Creating booking with userId:', userId);
       console.log('📝 Booking data:', createBookingDto);
+
+      // ✅ Validate userId
+      if (!userId) {
+        throw new BadRequestException('User ID là bắt buộc để đặt sân');
+      }
 
       // Kiểm tra sân có tồn tại
       const court = await this.courtRepository.findOne({
@@ -83,10 +89,10 @@ export class BookingService {
       const duration = endHour - startHour;
       const totalAmount = court.hourly_rate * duration;
 
-      // ✅ Chuẩn bị booking data với user_id có thể null
+      // ✅ Chuẩn bị booking data với user_id bắt buộc
       const bookingData = {
         court_id: createBookingDto.court_id,
-        user_id: userId, // ✅ Có thể là null cho guest booking
+        user_id: userId, // ✅ Bắt buộc có user_id
         date: createBookingDto.date,
         booking_date: createBookingDto.date,
         start_time: createBookingDto.start_time,
@@ -113,22 +119,18 @@ export class BookingService {
 
       console.log('✅ Booking saved successfully:', savedBooking.booking_id);
 
-      // Chỉ tạo thông báo nếu có userId (user đã đăng nhập)
-      if (userId) {
-        try {
-          await this.notificationService.createBookingNotification(
-            userId,
-            savedBooking.booking_id,
-            'created',
-            savedBooking.booking_code,
-          );
-          console.log(`📅 Created booking notification for user ${userId}`);
-        } catch (notificationError) {
-          console.error('❌ Error creating notification:', notificationError);
-          // Không throw error nếu notification fail
-        }
-      } else {
-        console.log('📅 Guest booking created - no notification sent');
+      // ✅ Luôn tạo thông báo vì user đã đăng nhập
+      try {
+        await this.notificationService.createBookingNotification(
+          userId,
+          savedBooking.booking_id,
+          'created',
+          savedBooking.booking_code,
+        );
+        console.log(`📅 Created booking notification for user ${userId}`);
+      } catch (notificationError) {
+        console.error('❌ Error creating notification:', notificationError);
+        // Không throw error nếu notification fail
       }
 
       return savedBooking;

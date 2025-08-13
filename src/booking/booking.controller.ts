@@ -36,26 +36,26 @@ interface RequestWithUser extends Request {
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
 
-  // Tạo đặt sân mới (cho phép truy cập public)
+  // ✅ Tạo đặt sân mới - YÊU CẦU ĐĂNG NHẬP
   @Post()
-  @Public()
+  @UseGuards(JwtAuthGuard) // ✅ Bỏ @Public(), thêm JwtAuthGuard
   async create(
     @Body() createBookingDto: CreateBookingDto,
     @Request() req: RequestWithUser,
   ) {
     try {
-      // ✅ Xử lý user_id logic đúng cách
-      let userId: number | null = null;
-
-      // Nếu có token và user đã đăng nhập
-      if (req.user && req.user.user_id) {
-        userId = req.user.user_id;
-        console.log('✅ Logged in user booking:', userId);
-      } else {
-        console.log('✅ Guest booking - no user_id');
+      // ✅ Đảm bảo user đã đăng nhập
+      if (!req.user || !req.user.user_id) {
+        throw new HttpException(
+          'Bạn cần đăng nhập để đặt sân',
+          HttpStatus.UNAUTHORIZED,
+        );
       }
 
-      // ✅ Gọi service với userId (có thể là null cho guest)
+      const userId = req.user.user_id;
+      console.log('🔐 User đã đăng nhập đặt sân:', userId);
+
+      // ✅ Gọi service với userId (bắt buộc)
       const booking = await this.bookingService.create(
         createBookingDto,
         userId,

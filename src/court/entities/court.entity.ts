@@ -1,32 +1,30 @@
 import {
   Entity,
-  Column,
   PrimaryGeneratedColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
+  Column,
   ManyToOne,
   JoinColumn,
-  OneToMany,
+  CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
-import { CourtType } from '../../court-type/entities/court-type.entity';
 import { Venue } from '../../venue/entities/venue.entity';
-import { Booking } from '../../booking/entities/booking.entity';
+import { CourtType } from '../../court-type/entities/court-type.entity';
 
 @Entity('courts')
 export class Court {
   @PrimaryGeneratedColumn()
   court_id: number;
 
-  @Column({ length: 100 })
+  @Column({ length: 255 })
   name: string;
 
-  @Column({ length: 20, unique: true })
+  @Column({ length: 50, unique: true })
   code: string;
 
-  @Column({ type: 'text', nullable: true })
-  description: string;
+  @Column('text', { nullable: true })
+  description?: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column('decimal', { precision: 10, scale: 2 })
   hourly_rate: number;
 
   @Column({
@@ -36,11 +34,20 @@ export class Court {
   })
   status: 'available' | 'booked' | 'maintenance';
 
-  @Column({ nullable: true })
-  image: string;
-
   @Column({ type: 'boolean', default: true })
   is_indoor: boolean;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  image?: string;
+
+  // ✅ Thêm trường court_level
+  @Column({
+    type: 'tinyint',
+    nullable: true,
+    default: 1,
+    comment: 'Cấp độ sân: 1=Nhỏ (5 người), 2=Vừa (7 người), 3=Lớn (11 người)',
+  })
+  court_level?: number;
 
   @Column()
   venue_id: number;
@@ -52,16 +59,13 @@ export class Court {
   @JoinColumn({ name: 'venue_id' })
   venue: Venue;
 
-  @ManyToOne(() => CourtType, (type) => type.courts)
+  @ManyToOne(() => CourtType, (courtType) => courtType.courts)
   @JoinColumn({ name: 'type_id' })
-  type: CourtType;
+  courtType: CourtType;
 
-  @CreateDateColumn({ type: 'timestamp' })
+  @CreateDateColumn()
   created_at: Date;
 
-  @UpdateDateColumn({ type: 'timestamp' })
+  @UpdateDateColumn()
   updated_at: Date;
-
-  @OneToMany(() => Booking, (booking) => booking.court)
-  bookings: Booking[];
 }

@@ -1,16 +1,16 @@
 import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtModule } from '@nestjs/jwt';
-import { JwtStrategy } from 'src/auth/jwt.strategy';
+import { JwtStrategy } from './jwt.strategy';
 
 @Module({
   imports: [
     JwtModule.register({
       secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: '1d' },
+      signOptions: { expiresIn: '7d' }, // ✅ Tăng thời gian token
     }),
   ],
   providers: [AuthService, JwtStrategy],
-  exports: [AuthService], // Xuất AuthService để sử dụng ở nơi khác
+  exports: [AuthService, JwtModule], // ✅ Export JwtModule
 })
 export class AuthModule {}
