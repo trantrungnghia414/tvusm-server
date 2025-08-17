@@ -186,17 +186,17 @@ export class NotificationService {
       confirmed: {
         title: '✅ Đặt sân được xác nhận',
         message: `Đặt sân ${bookingCode} của bạn đã được xác nhận. Chúc bạn có trải nghiệm tuyệt vời!`,
-        notificationType: NotificationType.SUCCESS,
+        notificationType: NotificationType.BOOKING, // ✅ Sử dụng BOOKING thay vì SUCCESS
       },
       cancelled: {
         title: '❌ Đặt sân bị hủy',
         message: `Đặt sân ${bookingCode} của bạn đã bị hủy. Nếu có thắc mắc, vui lòng liên hệ hỗ trợ.`,
-        notificationType: NotificationType.WARNING,
+        notificationType: NotificationType.BOOKING, // ✅ Sử dụng BOOKING thay vì WARNING
       },
       reminder: {
         title: '⏰ Nhắc nhở đặt sân',
         message: `Bạn có lịch đặt sân ${bookingCode} sắp diễn ra. Vui lòng chuẩn bị sẵn sàng!`,
-        notificationType: NotificationType.INFO,
+        notificationType: NotificationType.BOOKING, // ✅ Sử dụng BOOKING thay vì INFO
       },
     };
 
@@ -228,17 +228,17 @@ export class NotificationService {
       success: {
         title: '💳 Thanh toán thành công',
         message: `Thanh toán ${amount.toLocaleString('vi-VN')}đ cho đặt sân ${bookingCode} đã thành công.`,
-        notificationType: NotificationType.SUCCESS,
+        notificationType: NotificationType.PAYMENT, // ✅ Sử dụng PAYMENT thay vì SUCCESS
       },
       failed: {
         title: '❌ Thanh toán thất bại',
         message: `Thanh toán cho đặt sân ${bookingCode} thất bại. Vui lòng thử lại.`,
-        notificationType: NotificationType.ERROR,
+        notificationType: NotificationType.PAYMENT, // ✅ Sử dụng PAYMENT cho consistency
       },
       refund: {
         title: '💰 Hoàn tiền thành công',
         message: `Đã hoàn ${amount.toLocaleString('vi-VN')}đ cho đặt sân ${bookingCode} về tài khoản của bạn.`,
-        notificationType: NotificationType.SUCCESS,
+        notificationType: NotificationType.PAYMENT, // ✅ Sử dụng PAYMENT thay vì SUCCESS
       },
     };
 
@@ -275,17 +275,17 @@ export class NotificationService {
       updated: {
         title: '📝 Cập nhật sự kiện',
         message: `Sự kiện "${eventTitle}" đã có thay đổi thông tin. Vui lòng kiểm tra lại.`,
-        notificationType: NotificationType.INFO,
+        notificationType: NotificationType.EVENT, // ✅ Sử dụng EVENT thay vì INFO
       },
       cancelled: {
         title: '❌ Hủy sự kiện',
         message: `Sự kiện "${eventTitle}" đã bị hủy. Chúng tôi xin lỗi vì sự bất tiện này.`,
-        notificationType: NotificationType.WARNING,
+        notificationType: NotificationType.EVENT, // ✅ Sử dụng EVENT thay vì WARNING
       },
       reminder: {
         title: '⏰ Nhắc nhở sự kiện',
         message: `Sự kiện "${eventTitle}" sắp diễn ra. Đừng quên tham gia nhé!`,
-        notificationType: NotificationType.INFO,
+        notificationType: NotificationType.EVENT, // ✅ Sử dụng EVENT thay vì INFO
       },
     };
 
@@ -338,12 +338,12 @@ export class NotificationService {
       started: {
         title: '🛠️ Bắt đầu bảo trì',
         message: `Đang tiến hành bảo trì: ${details}. Một số chức năng có thể bị ảnh hưởng.`,
-        notificationType: NotificationType.WARNING,
+        notificationType: NotificationType.MAINTENANCE, // ✅ Sử dụng MAINTENANCE thay vì WARNING
       },
       completed: {
         title: '✅ Hoàn tất bảo trì',
         message: `Đã hoàn tất bảo trì: ${details}. Tất cả chức năng đã hoạt động bình thường.`,
-        notificationType: NotificationType.SUCCESS,
+        notificationType: NotificationType.MAINTENANCE, // ✅ Sử dụng MAINTENANCE thay vì SUCCESS
       },
     };
 

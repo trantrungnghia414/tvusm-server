@@ -4,6 +4,7 @@ import {
   IsString,
   IsNumber,
   IsEmail,
+  IsDateString,
 } from 'class-validator';
 
 export class CreateBookingDto {
@@ -11,12 +12,8 @@ export class CreateBookingDto {
   @IsNumber()
   court_id: number;
 
-  @IsOptional()
-  @IsNumber()
-  user_id?: number;
-
   @IsNotEmpty({ message: 'Vui lòng chọn ngày' })
-  @IsString()
+  @IsDateString()
   date: string;
 
   @IsNotEmpty({ message: 'Vui lòng chọn giờ bắt đầu' })
@@ -31,25 +28,26 @@ export class CreateBookingDto {
   @IsString()
   renter_name: string;
 
-  // ✅ Thay đổi email thành optional
+  @IsNotEmpty({ message: 'Vui lòng nhập số điện thoại' })
+  @IsString()
+  renter_phone: string;
+
+  // ✅ Email là optional
   @IsOptional()
   @IsEmail({}, { message: 'Vui lòng nhập email hợp lệ' })
   @IsString()
   renter_email?: string;
-
-  @IsNotEmpty({ message: 'Vui lòng nhập số điện thoại' })
-  @IsString()
-  renter_phone: string;
 
   @IsOptional()
   @IsString()
   notes?: string;
 
   @IsOptional()
-  @IsString()
-  payment_method?: string;
+  @IsNumber()
+  total_amount?: number;
 
+  // ✅ Thêm field payment_method
   @IsOptional()
   @IsString()
-  selected_times?: string;
+  payment_method?: string;
 }

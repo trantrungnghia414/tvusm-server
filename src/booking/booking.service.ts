@@ -30,13 +30,18 @@ export class BookingService {
     private readonly notificationService: NotificationService,
   ) {}
 
+  // ✅ Cập nhật method create để user_id bắt buộc
   async create(
     createBookingDto: CreateBookingDto,
-    userId: number | null,
+    userId: number,
   ): Promise<Booking> {
     try {
       console.log('🔄 Creating booking with userId:', userId);
       console.log('📝 Booking data:', createBookingDto);
+
+      if (!userId) {
+        throw new BadRequestException('User ID là bắt buộc để đặt sân');
+      }
 
       // Kiểm tra sân có tồn tại
       const court = await this.courtRepository.findOne({
@@ -53,22 +58,12 @@ export class BookingService {
         throw new BadRequestException('Sân này hiện không khả dụng để đặt');
       }
 
-      // Kiểm tra thời gian hợp lệ
-      const startTime = createBookingDto.start_time;
-      const endTime = createBookingDto.end_time;
-
-      if (startTime >= endTime) {
-        throw new BadRequestException(
-          'Thời gian bắt đầu phải trước thời gian kết thúc',
-        );
-      }
-
-      // Kiểm tra thời gian đặt sân có bị trùng không
+      // Kiểm tra khung giờ có sẵn
       const isTimeSlotAvailable = await this.checkAvailability(
         createBookingDto.court_id,
         createBookingDto.date,
-        startTime,
-        endTime,
+        createBookingDto.start_time,
+        createBookingDto.end_time,
       );
 
       if (!isTimeSlotAvailable) {
@@ -77,44 +72,68 @@ export class BookingService {
         );
       }
 
-      // Tính tổng tiền dựa trên số giờ và giá sân
-      const startHour = parseInt(startTime.split(':')[0]);
-      const endHour = parseInt(endTime.split(':')[0]);
-      const duration = endHour - startHour;
-      const totalAmount = court.hourly_rate * duration;
+      // Tính tổng tiền
+      const startTime = createBookingDto.start_time;
+      const endTime = createBookingDto.end_time;
 
-      // ✅ Chuẩn bị booking data với user_id có thể null
+      const startHour = parseInt(startTime.split(':')[0]);
+      const startMinute = parseInt(startTime.split(':')[1]) || 0;
+      const endHour = parseInt(endTime.split(':')[0]);
+      const endMinute = parseInt(endTime.split(':')[1]) || 0;
+
+      const startTimeInMinutes = startHour * 60 + startMinute;
+      const endTimeInMinutes = endHour * 60 + endMinute;
+      const durationInHours = (endTimeInMinutes - startTimeInMinutes) / 60;
+
+      const totalAmount = Math.max(
+        10000,
+        Math.round(court.hourly_rate * durationInHours),
+      );
+
+      console.log(
+        `💰 Court rate: ${court.hourly_rate}, Duration: ${durationInHours}h, Total: ${totalAmount}`,
+      );
+
+      // ✅ Xác định payment status dựa trên payment method
+      const paymentMethod = createBookingDto.payment_method || 'cash'; // ✅ Sử dụng string
+      const initialPaymentStatus =
+        paymentMethod === 'vnpay'
+          ? PaymentStatus.UNPAID // VNPay sẽ pending cho đến khi thanh toán
+          : PaymentStatus.UNPAID; // Cash cũng unpaid ban đầu
+
       const bookingData = {
         court_id: createBookingDto.court_id,
-        user_id: userId, // ✅ Có thể là null cho guest booking
+        user_id: userId,
         date: createBookingDto.date,
         booking_date: createBookingDto.date,
         start_time: createBookingDto.start_time,
         end_time: createBookingDto.end_time,
         renter_name: createBookingDto.renter_name,
         renter_phone: createBookingDto.renter_phone,
-        renter_email:
-          createBookingDto.renter_email && createBookingDto.renter_email.trim()
-            ? createBookingDto.renter_email.trim()
-            : null,
+        renter_email: createBookingDto.renter_email?.trim() || null,
         notes: createBookingDto.notes || null,
         total_amount: totalAmount,
-        status: BookingStatus.CONFIRMED,
+        status: BookingStatus.CONFIRMED, // ✅ Booking confirmed ngay
         booking_code: `BK${Date.now()}${Math.floor(Math.random() * 1000)}`,
-        booking_type: 'public',
-        payment_status: PaymentStatus.UNPAID,
+        booking_type: 'public', // ✅ Sử dụng string
+        payment_status: initialPaymentStatus,
+        payment_method: paymentMethod, // ✅ Lưu payment method
       };
 
       console.log('💾 Saving booking data:', bookingData);
 
-      // Tạo và lưu booking
       const newBooking = this.bookingRepository.create(bookingData);
       const savedBooking = await this.bookingRepository.save(newBooking);
 
-      console.log('✅ Booking saved successfully:', savedBooking.booking_id);
+      console.log('✅ Booking saved successfully:', {
+        booking_id: savedBooking.booking_id,
+        total_amount: savedBooking.total_amount,
+        payment_method: paymentMethod,
+        payment_status: savedBooking.payment_status,
+      });
 
-      // Chỉ tạo thông báo nếu có userId (user đã đăng nhập)
-      if (userId) {
+      // ✅ Chỉ tạo thông báo cho cash payment, VNPay sẽ tạo sau khi thanh toán thành công
+      if (paymentMethod === 'cash') {
         try {
           await this.notificationService.createBookingNotification(
             userId,
@@ -125,27 +144,13 @@ export class BookingService {
           console.log(`📅 Created booking notification for user ${userId}`);
         } catch (notificationError) {
           console.error('❌ Error creating notification:', notificationError);
-          // Không throw error nếu notification fail
         }
-      } else {
-        console.log('📅 Guest booking created - no notification sent');
       }
 
       return savedBooking;
     } catch (error) {
       console.error('❌ Error creating booking:', error);
-
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException ||
-        error instanceof ConflictException
-      ) {
-        throw error;
-      }
-
-      throw new BadRequestException(
-        `Không thể tạo đặt sân: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`,
-      );
+      throw error;
     }
   }
 
@@ -449,5 +454,14 @@ export class BookingService {
   // ✅ Method để validate BookingStatus
   public isValidBookingStatus(status: string): boolean {
     return Object.values(BookingStatus).includes(status as BookingStatus);
+  }
+
+  async updatePaymentStatus(
+    bookingId: number,
+    paymentStatus: 'pending' | 'paid' | 'refunded',
+  ): Promise<Booking> {
+    const booking = await this.findOne(bookingId);
+    booking.payment_status = paymentStatus as PaymentStatus;
+    return this.bookingRepository.save(booking);
   }
 }

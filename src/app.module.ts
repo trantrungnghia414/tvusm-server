@@ -43,6 +43,9 @@ import { BookingModule } from 'src/booking/booking.module';
 import { Notification } from 'src/notification/entities/notification.entity';
 import { NotificationModule } from 'src/notification/notification.module';
 
+import { Payment } from 'src/payment/entities/payment.entity';
+import { PaymentModule } from 'src/payment/payment.module';
+
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -52,7 +55,7 @@ import { NotificationModule } from 'src/notification/notification.module';
       port: 3306,
       username: 'root',
       password: '123456',
-      database: 'tvusm_db',
+      database: 'tvusm_web',
       entities: [
         User,
         Venue,
@@ -67,6 +70,7 @@ import { NotificationModule } from 'src/notification/notification.module';
         EquipmentCategory,
         Booking,
         Notification,
+        Payment, // ✅ Thêm Payment entity
       ],
       synchronize: false, // Chỉ nên để true trong môi trường phát triển
     }),
@@ -82,6 +86,7 @@ import { NotificationModule } from 'src/notification/notification.module';
     EquipmentModule,
     BookingModule,
     NotificationModule,
+    PaymentModule,
     ConfigModule.forRoot({
       isGlobal: true, // Để biến môi trường có thể sử dụng ở bất kỳ đâu trong ứng dụng
     }),

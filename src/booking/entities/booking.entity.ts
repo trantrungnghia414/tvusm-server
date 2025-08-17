@@ -80,8 +80,8 @@ export class Booking {
   booking_code: string;
 
   @Column({
-    type: 'enum',
-    enum: ['public', 'private', 'event'],
+    type: 'varchar',
+    length: 50,
     default: 'public',
   })
   booking_type: string;
@@ -101,4 +101,13 @@ export class Booking {
   @ManyToOne(() => User, (user) => user.bookings, { nullable: true })
   @JoinColumn({ name: 'user_id' })
   user: User | null;
+
+  // ✅ Thêm field payment_method với string
+  @Column({
+    type: 'varchar',
+    length: 50,
+    default: 'cash',
+    nullable: true,
+  })
+  payment_method?: string;
 }

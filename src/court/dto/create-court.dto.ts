@@ -56,6 +56,13 @@ export class CreateCourtDto {
   @IsNumber({}, { message: 'ID loại sân phải là số' })
   type_id: number;
 
+  // ✅ Thêm trường court_level
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'Cấp độ sân phải là số' })
+  @Min(1, { message: 'Cấp độ sân phải từ 1 trở lên' })
+  court_level?: number;
+
   @IsOptional()
   image?: string;
 }

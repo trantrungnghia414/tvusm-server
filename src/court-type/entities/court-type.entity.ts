@@ -25,7 +25,7 @@ export class CourtType {
   @Column({ nullable: true })
   image: string;
 
-  @OneToMany(() => Court, (court) => court.type)
+  @OneToMany(() => Court, (court) => court.courtType)
   courts: Court[];
 
   @CreateDateColumn({ type: 'timestamp' })

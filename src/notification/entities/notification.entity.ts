@@ -16,10 +16,6 @@ export enum NotificationType {
   EVENT = 'event',
   SYSTEM = 'system',
   MAINTENANCE = 'maintenance',
-  SUCCESS = 'success',
-  WARNING = 'warning',
-  ERROR = 'error',
-  INFO = 'info',
 }
 
 @Entity('notifications')
