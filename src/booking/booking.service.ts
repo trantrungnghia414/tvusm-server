@@ -213,7 +213,7 @@ export class BookingService {
     courtId?: number,
   ): Promise<Booking[]> {
     const queryOptions: FindManyOptions<Booking> = {
-      relations: ['court'],
+      relations: ['court', 'user'],
       order: { created_at: 'DESC' },
     };
 

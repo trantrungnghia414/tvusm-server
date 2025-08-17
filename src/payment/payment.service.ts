@@ -224,4 +224,34 @@ export class PaymentService {
 
     return this.paymentRepository.save(payment);
   }
+
+  async updatePaidAt(id: number, paidAt: Date): Promise<Payment> {
+    const payment = await this.findOne(id);
+    payment.paid_at = paidAt;
+    payment.updated_at = new Date();
+    return this.paymentRepository.save(payment);
+  }
+
+  async updatePayment(
+    id: number,
+    updateData: { status?: PaymentStatus; paid_at?: string },
+  ): Promise<Payment> {
+    const payment = await this.findOne(id);
+
+    if (updateData.status) {
+      payment.status = updateData.status;
+
+      // Nếu status thành completed thì tự động set paid_at
+      if (updateData.status === PaymentStatus.COMPLETED && !payment.paid_at) {
+        payment.paid_at = new Date();
+      }
+    }
+
+    if (updateData.paid_at) {
+      payment.paid_at = new Date(updateData.paid_at);
+    }
+
+    payment.updated_at = new Date();
+    return this.paymentRepository.save(payment);
+  }
 }

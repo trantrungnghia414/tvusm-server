@@ -151,4 +151,18 @@ export class PaymentController {
   updateStatus(@Param('id') id: string, @Body('status') status: PaymentStatus) {
     return this.paymentService.updateStatus(+id, status);
   }
+
+  // ✅ Thêm endpoint PATCH /payments/:id để cập nhật payment từ admin dashboard
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'staff')
+  async updatePayment(
+    @Param('id') id: string,
+    @Body() updateData: { status?: PaymentStatus; paid_at?: string },
+  ) {
+    const paymentId = +id;
+
+    // Sử dụng method updatePayment từ service
+    return this.paymentService.updatePayment(paymentId, updateData);
+  }
 }
