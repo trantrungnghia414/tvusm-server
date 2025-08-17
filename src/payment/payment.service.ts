@@ -254,4 +254,128 @@ export class PaymentService {
     payment.updated_at = new Date();
     return this.paymentRepository.save(payment);
   }
+
+  async getStats() {
+    try {
+      // Lấy tất cả payments
+      const allPayments = await this.paymentRepository.find();
+
+      // Lấy ngày hôm nay
+      const today = new Date();
+      const startOfToday = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+      );
+      const endOfToday = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate() + 1,
+      );
+
+      // Lấy tháng hiện tại
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+
+      // Tính toán các thống kê cơ bản
+      const totalPayments = allPayments.length;
+      const totalAmount = allPayments.reduce(
+        (sum, p) => sum + Number(p.amount),
+        0,
+      );
+
+      // Thống kê theo status
+      const pendingPayments = allPayments.filter(
+        (p) => p.status === PaymentStatus.PENDING,
+      ).length;
+      const completedPayments = allPayments.filter(
+        (p) => p.status === PaymentStatus.COMPLETED,
+      ).length;
+      const failedPayments = allPayments.filter(
+        (p) => p.status === PaymentStatus.FAILED,
+      ).length;
+
+      // Tính toán amount theo status
+      const pendingAmount = allPayments
+        .filter((p) => p.status === PaymentStatus.PENDING)
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+
+      const completedAmount = allPayments
+        .filter((p) => p.status === PaymentStatus.COMPLETED)
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+
+      const refundedAmount = allPayments
+        .filter((p) => p.status === PaymentStatus.REFUNDED)
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+
+      // Doanh thu hôm nay
+      const todayPayments = allPayments.filter((p) => {
+        const paymentDate = new Date(p.created_at);
+        return (
+          paymentDate >= startOfToday &&
+          paymentDate < endOfToday &&
+          p.status === PaymentStatus.COMPLETED
+        );
+      });
+      const todayRevenue = todayPayments.reduce(
+        (sum, p) => sum + Number(p.amount),
+        0,
+      );
+
+      // Doanh thu tháng
+      const monthlyPayments = allPayments.filter((p) => {
+        const paymentDate = new Date(p.created_at);
+        return (
+          paymentDate >= startOfMonth &&
+          paymentDate < endOfMonth &&
+          p.status === PaymentStatus.COMPLETED
+        );
+      });
+      const monthlyRevenue = monthlyPayments.reduce(
+        (sum, p) => sum + Number(p.amount),
+        0,
+      );
+
+      // Thống kê theo payment method
+      const cashPayments = allPayments.filter(
+        (p) => p.payment_method === PaymentMethod.CASH,
+      ).length;
+      const vnpayPayments = allPayments.filter(
+        (p) => p.payment_method === PaymentMethod.VNPAY,
+      ).length;
+      const onlinePayments = vnpayPayments; // Hiện tại chỉ có VNPay
+
+      return {
+        totalPayments,
+        totalAmount,
+        pendingPayments,
+        pendingAmount,
+        completedPayments,
+        completedAmount,
+        failedPayments,
+        refundedAmount,
+        todayRevenue,
+        monthlyRevenue,
+        cashPayments,
+        onlinePayments,
+      };
+    } catch (error) {
+      console.error('Error getting payment stats:', error);
+      // Trả về stats rỗng khi có lỗi
+      return {
+        totalPayments: 0,
+        totalAmount: 0,
+        pendingPayments: 0,
+        pendingAmount: 0,
+        completedPayments: 0,
+        completedAmount: 0,
+        failedPayments: 0,
+        refundedAmount: 0,
+        todayRevenue: 0,
+        monthlyRevenue: 0,
+        cashPayments: 0,
+        onlinePayments: 0,
+      };
+    }
+  }
 }

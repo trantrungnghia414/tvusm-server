@@ -133,6 +133,13 @@ export class PaymentController {
     return this.paymentService.findAll();
   }
 
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'staff')
+  async getStats() {
+    return this.paymentService.getStats();
+  }
+
   @Get('my-payments')
   @UseGuards(JwtAuthGuard)
   findMyPayments(@Request() req: AuthenticatedRequest) {
