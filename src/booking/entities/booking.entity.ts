@@ -3,12 +3,14 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  OneToOne,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Court } from '../../court/entities/court.entity';
 import { User } from '../../user/entities/user.entity';
+import { Payment } from '../../payment/entities/payment.entity';
 
 export enum BookingStatus {
   PENDING = 'pending',
@@ -101,6 +103,10 @@ export class Booking {
   @ManyToOne(() => User, (user) => user.bookings, { nullable: true })
   @JoinColumn({ name: 'user_id' })
   user: User | null;
+
+  // ✅ Relation với Payment - nullable
+  @OneToOne(() => Payment, (payment) => payment.booking, { nullable: true })
+  payment: Payment | null;
 
   // ✅ Thêm field payment_method với string
   @Column({
