@@ -63,6 +63,13 @@ export class CreateCourtDto {
   @Min(1, { message: 'Cấp độ sân phải từ 1 trở lên' })
   court_level?: number;
 
+  // ✅ Thêm trường sub_court_count
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'Số lượng sân con phải là số' })
+  @Min(1, { message: 'Số lượng sân con phải từ 1 trở lên' })
+  sub_court_count?: number;
+
   @IsOptional()
   image?: string;
 }

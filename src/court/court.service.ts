@@ -22,6 +22,7 @@ interface CourtQueryResult {
   court_is_indoor: boolean;
   court_image: string | null;
   court_court_level: number | null;
+  court_sub_court_count: number | null;
   court_venue_id: number;
   court_type_id: number;
   court_created_at: Date;
@@ -41,6 +42,7 @@ interface CourtResponse {
   is_indoor: boolean;
   image: string | null;
   court_level: number | null;
+  sub_court_count: number | null;
   venue_id: number;
   type_id: number;
   venue_name: string;
@@ -110,6 +112,7 @@ export class CourtService {
         status: createCourtDto.status || ('available' as const),
         is_indoor: Boolean(createCourtDto.is_indoor),
         court_level: createCourtDto.court_level || 1,
+        sub_court_count: createCourtDto.sub_court_count || 1,
         venue_id: createCourtDto.venue_id,
         type_id: createCourtDto.type_id,
         image: createCourtDto.image,
@@ -146,6 +149,7 @@ export class CourtService {
           'court.is_indoor',
           'court.image',
           'court.court_level',
+          'court.sub_court_count',
           'court.venue_id',
           'court.type_id',
           'court.created_at',
@@ -168,6 +172,7 @@ export class CourtService {
           is_indoor: court.court_is_indoor,
           image: court.court_image,
           court_level: court.court_court_level,
+          sub_court_count: court.court_sub_court_count,
           venue_id: court.court_venue_id,
           type_id: court.court_type_id,
           venue_name: court.venue_name,
@@ -294,6 +299,8 @@ export class CourtService {
         court.is_indoor = Boolean(updateCourtDto.is_indoor);
       if (updateCourtDto.court_level !== undefined)
         court.court_level = updateCourtDto.court_level;
+      if (updateCourtDto.sub_court_count !== undefined)
+        court.sub_court_count = updateCourtDto.sub_court_count;
       if (updateCourtDto.venue_id !== undefined)
         court.venue_id = updateCourtDto.venue_id;
       if (updateCourtDto.type_id !== undefined)

@@ -49,6 +49,15 @@ export class Court {
   })
   court_level?: number;
 
+  // ✅ Thêm trường sub_court_count cho số lượng sân con
+  @Column({
+    type: 'tinyint',
+    nullable: true,
+    default: 1,
+    comment: 'Số lượng sân con có thể chia từ sân chính',
+  })
+  sub_court_count?: number;
+
   @Column()
   venue_id: number;
 
