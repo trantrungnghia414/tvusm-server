@@ -3,9 +3,7 @@ import {
   IsString,
   IsOptional,
   IsNumber,
-  IsPositive,
   IsEnum,
-  Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { EquipmentStatus } from '../entities/equipment.entity';
@@ -23,18 +21,6 @@ export class CreateEquipmentDto {
   @Type(() => Number)
   @IsNumber()
   category_id: number;
-
-  @IsNotEmpty()
-  @Type(() => Number)
-  @IsNumber()
-  @IsPositive()
-  quantity: number;
-
-  @IsNotEmpty()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  available_quantity: number;
 
   @IsOptional()
   @IsEnum(EquipmentStatus)
@@ -56,10 +42,50 @@ export class CreateEquipmentDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  rental_fee?: number;
+  venue_id?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  venue_id?: number;
+  court_id?: number;
+
+  @IsOptional()
+  @IsString()
+  location_detail?: string;
+
+  @IsOptional()
+  @IsString()
+  serial_number?: string;
+
+  @IsOptional()
+  @IsString()
+  manufacturer?: string;
+
+  @IsOptional()
+  @IsString()
+  model?: string;
+
+  @IsOptional()
+  @IsString()
+  warranty_expiry?: string;
+
+  @IsOptional()
+  @IsString()
+  last_maintenance_date?: string;
+
+  @IsOptional()
+  @IsString()
+  next_maintenance_date?: string;
+
+  @IsOptional()
+  @IsString()
+  installation_date?: string;
+
+  @IsOptional()
+  @IsString()
+  qr_code?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { EquipmentCategory } from './equipment-category.entity';
 import { Venue } from '../../venue/entities/venue.entity';
+import { Court } from '../../court/entities/court.entity';
 import { User } from '../../user/entities/user.entity';
 
 export enum EquipmentStatus {
@@ -32,12 +33,6 @@ export class Equipment {
   @Column()
   category_id: number;
 
-  @Column({ default: 1 })
-  quantity: number;
-
-  @Column({ default: 1 })
-  available_quantity: number;
-
   @Column({
     type: 'enum',
     enum: EquipmentStatus,
@@ -54,11 +49,41 @@ export class Equipment {
   @Column({ nullable: true, type: 'decimal', precision: 10, scale: 2 })
   purchase_price: number;
 
-  @Column({ default: 0, type: 'decimal', precision: 10, scale: 2 })
-  rental_fee: number;
-
   @Column({ nullable: true })
   venue_id: number;
+
+  @Column({ nullable: true })
+  court_id: number;
+
+  @Column({ nullable: true })
+  location_detail: string;
+
+  @Column({ nullable: true })
+  serial_number: string;
+
+  @Column({ nullable: true })
+  manufacturer: string;
+
+  @Column({ nullable: true })
+  model: string;
+
+  @Column({ nullable: true, type: 'date' })
+  warranty_expiry: Date;
+
+  @Column({ nullable: true, type: 'date' })
+  last_maintenance_date: Date;
+
+  @Column({ nullable: true, type: 'date' })
+  next_maintenance_date: Date;
+
+  @Column({ nullable: true, type: 'date' })
+  installation_date: Date;
+
+  @Column({ nullable: true })
+  qr_code: string;
+
+  @Column({ nullable: true, type: 'text' })
+  notes: string;
 
   @Column({ nullable: true })
   image: string;
@@ -79,6 +104,10 @@ export class Equipment {
   @ManyToOne(() => Venue)
   @JoinColumn({ name: 'venue_id' })
   venue: Venue;
+
+  @ManyToOne(() => Court)
+  @JoinColumn({ name: 'court_id' })
+  court: Court;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'added_by' })

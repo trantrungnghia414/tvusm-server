@@ -44,6 +44,7 @@ export class EquipmentService {
         .createQueryBuilder('equipment')
         .leftJoinAndSelect('equipment.category', 'category')
         .leftJoinAndSelect('equipment.venue', 'venue')
+        .leftJoinAndSelect('equipment.court', 'court')
         .leftJoinAndSelect('equipment.user', 'user');
 
       if (search) {
@@ -62,16 +63,20 @@ export class EquipmentService {
       return equipments.map((item) => {
         const category_name = item.category ? item.category.name : null;
         const venue_name = item.venue ? item.venue.name : null;
+        const court_name = item.court ? item.court.name : null;
+        const court_code = item.court ? item.court.code : null;
         const added_by_name = item.user
           ? item.user.fullname || item.user.username
           : null;
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { category, venue, user, ...rest } = item;
+        const { category, venue, court, user, ...rest } = item;
         return {
           ...rest,
           category_name,
           venue_name,
+          court_name,
+          court_code,
           added_by_name,
         } as EquipmentWithExtras;
       });
@@ -89,11 +94,14 @@ export class EquipmentService {
         .createQueryBuilder('equipment')
         .leftJoin('equipment.category', 'category')
         .leftJoin('equipment.venue', 'venue')
+        .leftJoin('equipment.court', 'court')
         .leftJoin('equipment.user', 'user')
         .select([
           'equipment',
           'category.name',
           'venue.name',
+          'court.name',
+          'court.code',
           'user.fullname',
           'user.username',
         ])
@@ -106,16 +114,20 @@ export class EquipmentService {
 
       const category_name = equipment.category ? equipment.category.name : null;
       const venue_name = equipment.venue ? equipment.venue.name : null;
+      const court_name = equipment.court ? equipment.court.name : null;
+      const court_code = equipment.court ? equipment.court.code : null;
       const added_by_name = equipment.user
         ? equipment.user.fullname || equipment.user.username
         : null;
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { category, venue, user, ...rest } = equipment;
+      const { category, venue, court, user, ...rest } = equipment;
       return {
         ...rest,
         category_name,
         venue_name,
+        court_name,
+        court_code,
         added_by_name,
       } as EquipmentWithExtras;
     } catch (error) {
