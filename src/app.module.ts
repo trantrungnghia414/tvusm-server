@@ -46,6 +46,9 @@ import { NotificationModule } from 'src/notification/notification.module';
 import { Payment } from 'src/payment/entities/payment.entity';
 import { PaymentModule } from 'src/payment/payment.module';
 
+import { EquipmentIssue } from './equipment-issues/entities/equipment-issue.entity';
+import { EquipmentIssuesModule } from './equipment-issues/equipment-issues.module';
+
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -70,7 +73,8 @@ import { PaymentModule } from 'src/payment/payment.module';
         EquipmentCategory,
         Booking,
         Notification,
-        Payment, // ✅ Thêm Payment entity
+        Payment,
+        EquipmentIssue,
       ],
       synchronize: false, // Chỉ nên để true trong môi trường phát triển
     }),
@@ -87,6 +91,7 @@ import { PaymentModule } from 'src/payment/payment.module';
     BookingModule,
     NotificationModule,
     PaymentModule,
+    EquipmentIssuesModule,
     ConfigModule.forRoot({
       isGlobal: true, // Để biến môi trường có thể sử dụng ở bất kỳ đâu trong ứng dụng
     }),
