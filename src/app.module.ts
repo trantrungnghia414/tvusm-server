@@ -49,6 +49,8 @@ import { PaymentModule } from 'src/payment/payment.module';
 import { EquipmentIssue } from './equipment-issues/entities/equipment-issue.entity';
 import { EquipmentIssuesModule } from './equipment-issues/equipment-issues.module';
 
+import { ReportsModule } from './reports/reports.module';
+
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -92,6 +94,7 @@ import { EquipmentIssuesModule } from './equipment-issues/equipment-issues.modul
     NotificationModule,
     PaymentModule,
     EquipmentIssuesModule,
+    ReportsModule,
     ConfigModule.forRoot({
       isGlobal: true, // Để biến môi trường có thể sử dụng ở bất kỳ đâu trong ứng dụng
     }),
