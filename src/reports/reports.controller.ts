@@ -18,15 +18,13 @@ export class ReportsController {
     @Query('start_date') startDate?: string,
     @Query('end_date') endDate?: string,
     @Query('court_type') courtType?: string,
-    @Query('venue') venue?: string,
-    @Query('court') court?: string, // Thêm filter theo court
+    @Query('court') court?: string,
   ) {
     return this.reportsService.getOverviewStats({
       startDate,
       endDate,
       courtType,
-      venue,
-      court, // Thêm court filter
+      court,
     });
   }
 
@@ -35,14 +33,12 @@ export class ReportsController {
     @Query('start_date') startDate?: string,
     @Query('end_date') endDate?: string,
     @Query('court_type') courtType?: string,
-    @Query('venue') venue?: string,
     @Query('court') court?: string,
   ) {
     return this.reportsService.getRevenueTimeline({
       startDate,
       endDate,
       courtType,
-      venue,
       court,
     });
   }
@@ -52,7 +48,6 @@ export class ReportsController {
     @Query('start_date') startDate?: string,
     @Query('end_date') endDate?: string,
     @Query('court_type') courtType?: string,
-    @Query('venue') venue?: string,
     @Query('court') court?: string,
     @Query('limit') limit = 10,
   ) {
@@ -60,7 +55,6 @@ export class ReportsController {
       startDate,
       endDate,
       courtType,
-      venue,
       court,
       limit: Number(limit),
     });
@@ -71,14 +65,12 @@ export class ReportsController {
     @Query('start_date') startDate?: string,
     @Query('end_date') endDate?: string,
     @Query('court_type') courtType?: string,
-    @Query('venue') venue?: string,
     @Query('court') court?: string,
   ) {
     return this.reportsService.getCourtPerformance({
       startDate,
       endDate,
       courtType,
-      venue,
       court,
     });
   }
@@ -88,14 +80,12 @@ export class ReportsController {
     @Query('start_date') startDate?: string,
     @Query('end_date') endDate?: string,
     @Query('court_type') courtType?: string,
-    @Query('venue') venue?: string,
     @Query('court') court?: string,
   ) {
     return this.reportsService.getPaymentMethodStats({
       startDate,
       endDate,
       courtType,
-      venue,
       court,
     });
   }
@@ -105,14 +95,12 @@ export class ReportsController {
     @Query('start_date') startDate?: string,
     @Query('end_date') endDate?: string,
     @Query('court_type') courtType?: string,
-    @Query('venue') venue?: string,
     @Query('court') court?: string,
   ) {
     return this.reportsService.getHourlyStats({
       startDate,
       endDate,
       courtType,
-      venue,
       court,
     });
   }

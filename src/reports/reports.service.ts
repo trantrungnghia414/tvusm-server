@@ -13,18 +13,15 @@ export interface ReportFilters {
   startDate?: string;
   endDate?: string;
   courtType?: string;
-  venue?: string;
   court?: string;
   limit?: number;
 }
 
 export interface FilterOptionsResponse {
   courtTypes: Array<{ type_id: number; name: string }>;
-  venues: Array<{ venue_id: number; name: string }>;
   courts: Array<{
     court_id: number;
     name: string;
-    venue_id: number;
     type_id: number;
   }>;
 }
@@ -124,27 +121,20 @@ export class ReportsService {
       console.log('- Venues:', venueCount);
       console.log('- Court Types:', courtTypeCount);
 
-      const [courtTypes, venues, courts] = await Promise.all([
+      const [courtTypes, courts] = await Promise.all([
         this.courtTypeRepository.find({
           select: ['type_id', 'name'],
           order: { name: 'ASC' },
         }),
-        this.venueRepository.find({
-          select: ['venue_id', 'name'],
-          where: { status: 'active' },
-          order: { name: 'ASC' },
-        }),
         this.courtRepository.find({
-          select: ['court_id', 'name', 'venue_id', 'type_id'],
+          select: ['court_id', 'name', 'type_id'],
           where: { status: 'available' },
-          relations: ['venue'],
           order: { name: 'ASC' },
         }),
       ]);
 
       console.log('📋 Query results:');
       console.log('- Court Types found:', courtTypes.length);
-      console.log('- Venues found:', venues.length);
       console.log('- Courts found:', courts.length);
 
       if (courts.length > 0) {
@@ -156,21 +146,15 @@ export class ReportsService {
           type_id: ct.type_id,
           name: ct.name,
         })),
-        venues: venues.map((v) => ({
-          venue_id: v.venue_id,
-          name: v.name,
-        })),
         courts: courts.map((c) => ({
           court_id: c.court_id,
           name: c.name,
-          venue_id: c.venue_id,
           type_id: c.type_id,
         })),
       };
 
       console.log('✅ Final result structure:', {
         courtTypes: result.courtTypes.length,
-        venues: result.venues.length,
         courts: result.courts.length,
       });
 
@@ -183,7 +167,6 @@ export class ReportsService {
       );
       return {
         courtTypes: [],
-        venues: [],
         courts: [],
       };
     }
@@ -193,7 +176,7 @@ export class ReportsService {
     query: SelectQueryBuilder<Booking>,
     filters: ReportFilters,
   ): SelectQueryBuilder<Booking> {
-    const { startDate, endDate, courtType, venue, court } = filters;
+    const { startDate, endDate, courtType, court } = filters;
 
     if (startDate) {
       query = query.andWhere('booking.date >= :startDate', { startDate });
@@ -203,9 +186,6 @@ export class ReportsService {
     }
     if (courtType && courtType !== 'all') {
       query = query.andWhere('court.type_id = :courtType', { courtType });
-    }
-    if (venue && venue !== 'all') {
-      query = query.andWhere('court.venue_id = :venue', { venue });
     }
     if (court && court !== 'all') {
       query = query.andWhere('court.court_id = :court', { court });
@@ -239,7 +219,7 @@ export class ReportsService {
     const avgBookingValue =
       totalBookings > 0 ? totalRevenue / totalBookings : 0;
 
-    const { startDate, endDate, courtType, venue, court } = filters;
+    const { startDate, endDate, courtType, court } = filters;
     const daysDiff =
       startDate && endDate
         ? Math.ceil(
@@ -273,7 +253,6 @@ export class ReportsService {
         startDate: previousStartDate,
         endDate: previousEndDate,
         courtType,
-        venue,
         court,
       });
     }
