@@ -204,6 +204,7 @@ export class ReportsService {
       .leftJoin('booking.court', 'court')
       .leftJoin('court.venue', 'courtVenue')
       .leftJoin('court.courtType', 'courtTypeEntity')
+      .leftJoin('booking.payments', 'payment')
       .where('booking.status IN (:...statuses)', {
         statuses: ['confirmed', 'completed'],
       });
@@ -211,13 +212,54 @@ export class ReportsService {
     query = this.applyFilters(query, filters);
 
     const currentBookings = await query.getMany();
-    const totalRevenue = currentBookings.reduce(
-      (sum, booking) => sum + Number(booking.total_amount),
-      0,
-    );
+
+    // Calculate revenue only from completed payments
+    let revenueQuery = this.paymentRepository
+      .createQueryBuilder('payment')
+      .leftJoin('payment.booking', 'booking')
+      .leftJoin('booking.court', 'court')
+      .leftJoin('court.venue', 'courtVenue')
+      .leftJoin('court.courtType', 'courtTypeEntity')
+      .where('payment.status = :status', { status: 'completed' })
+      .andWhere('booking.status IN (:...statuses)', {
+        statuses: ['confirmed', 'completed'],
+      });
+
+    if (filters.startDate) {
+      revenueQuery = revenueQuery.andWhere(
+        'DATE(booking.booking_date) >= :startDate',
+        { startDate: filters.startDate },
+      );
+    }
+
+    if (filters.endDate) {
+      revenueQuery = revenueQuery.andWhere(
+        'DATE(booking.booking_date) <= :endDate',
+        { endDate: filters.endDate },
+      );
+    }
+
+    if (filters.courtType && filters.courtType !== 'all') {
+      revenueQuery = revenueQuery.andWhere(
+        'courtTypeEntity.type_id = :courtType',
+        { courtType: filters.courtType },
+      );
+    }
+
+    if (filters.court && filters.court !== 'all') {
+      revenueQuery = revenueQuery.andWhere('court.court_id = :court', {
+        court: filters.court,
+      });
+    }
+
+    const totalRevenue = (await revenueQuery
+      .select('COALESCE(SUM(payment.amount), 0)', 'total')
+      .getRawOne()) as { total: string };
+
+    const revenueAmount = Number(totalRevenue?.total || 0);
     const totalBookings = currentBookings.length;
     const avgBookingValue =
-      totalBookings > 0 ? totalRevenue / totalBookings : 0;
+      totalBookings > 0 ? revenueAmount / totalBookings : 0;
 
     const { startDate, endDate, courtType, court } = filters;
     const daysDiff =
@@ -266,7 +308,7 @@ export class ReportsService {
 
     const revenueGrowth =
       previousRevenue > 0
-        ? ((totalRevenue - previousRevenue) / previousRevenue) * 100
+        ? ((revenueAmount - previousRevenue) / previousRevenue) * 100
         : 0;
     const bookingGrowth =
       previousBookingCount > 0
@@ -321,7 +363,7 @@ export class ReportsService {
       totalCustomers > 0 ? (repeatCustomers / totalCustomers) * 100 : 0;
 
     return {
-      total_revenue: totalRevenue,
+      total_revenue: revenueAmount,
       total_bookings: totalBookings,
       avg_booking_value: avgBookingValue,
       revenue_growth: revenueGrowth,
@@ -333,19 +375,49 @@ export class ReportsService {
   }
 
   async getRevenueTimeline(filters: ReportFilters) {
-    let query = this.bookingRepository
-      .createQueryBuilder('booking')
-      .select('booking.date', 'date')
-      .addSelect('SUM(booking.total_amount)', 'revenue')
-      .addSelect('COUNT(booking.booking_id)', 'bookings_count')
+    let query = this.paymentRepository
+      .createQueryBuilder('payment')
+      .select('DATE(booking.booking_date)', 'date')
+      .addSelect('COALESCE(SUM(payment.amount), 0)', 'revenue')
+      .addSelect('COUNT(DISTINCT booking.booking_id)', 'bookings_count')
+      .leftJoin('payment.booking', 'booking')
       .leftJoin('booking.court', 'court')
-      .where('booking.status IN (:...statuses)', {
+      .leftJoin('court.venue', 'courtVenue')
+      .leftJoin('court.courtType', 'courtTypeEntity')
+      .where('payment.status = :paymentStatus', { paymentStatus: 'completed' })
+      .andWhere('booking.status IN (:...statuses)', {
         statuses: ['confirmed', 'completed'],
-      })
-      .groupBy('booking.date')
-      .orderBy('booking.date', 'ASC');
+      });
 
-    query = this.applyFilters(query, filters);
+    // Apply filters using the same logic as overview stats
+    if (filters.startDate) {
+      query = query.andWhere('DATE(booking.booking_date) >= :startDate', {
+        startDate: filters.startDate,
+      });
+    }
+
+    if (filters.endDate) {
+      query = query.andWhere('DATE(booking.booking_date) <= :endDate', {
+        endDate: filters.endDate,
+      });
+    }
+
+    if (filters.courtType && filters.courtType !== 'all') {
+      query = query.andWhere('courtTypeEntity.type_id = :courtType', {
+        courtType: filters.courtType,
+      });
+    }
+
+    if (filters.court && filters.court !== 'all') {
+      query = query.andWhere('court.court_id = :court', {
+        court: filters.court,
+      });
+    }
+
+    query = query
+      .groupBy('DATE(booking.booking_date)')
+      .orderBy('DATE(booking.booking_date)', 'ASC');
+
     const results = await query.getRawMany<RevenueTimelineRaw>();
 
     return results.map((row) => ({
@@ -358,25 +430,55 @@ export class ReportsService {
   async getTopCustomers(filters: ReportFilters) {
     const { limit = 10 } = filters;
 
-    let query = this.bookingRepository
-      .createQueryBuilder('booking')
+    let query = this.paymentRepository
+      .createQueryBuilder('payment')
       .select('user.user_id', 'customer_id')
       .addSelect('user.fullname', 'customer_name')
       .addSelect('user.email', 'customer_email')
       .addSelect('user.phone', 'customer_phone')
-      .addSelect('COUNT(booking.booking_id)', 'total_bookings')
-      .addSelect('SUM(booking.total_amount)', 'total_revenue')
-      .addSelect('MAX(booking.date)', 'last_booking_date')
+      .addSelect('COUNT(DISTINCT booking.booking_id)', 'total_bookings')
+      .addSelect('COALESCE(SUM(payment.amount), 0)', 'total_revenue')
+      .addSelect('MAX(booking.booking_date)', 'last_booking_date')
+      .leftJoin('payment.booking', 'booking')
       .leftJoin('booking.user', 'user')
       .leftJoin('booking.court', 'court')
-      .where('booking.status IN (:...statuses)', {
+      .leftJoin('court.venue', 'courtVenue')
+      .leftJoin('court.courtType', 'courtTypeEntity')
+      .where('payment.status = :paymentStatus', { paymentStatus: 'completed' })
+      .andWhere('booking.status IN (:...statuses)', {
         statuses: ['confirmed', 'completed'],
-      })
+      });
+
+    // Apply filters
+    if (filters.startDate) {
+      query = query.andWhere('DATE(booking.booking_date) >= :startDate', {
+        startDate: filters.startDate,
+      });
+    }
+
+    if (filters.endDate) {
+      query = query.andWhere('DATE(booking.booking_date) <= :endDate', {
+        endDate: filters.endDate,
+      });
+    }
+
+    if (filters.courtType && filters.courtType !== 'all') {
+      query = query.andWhere('courtTypeEntity.type_id = :courtType', {
+        courtType: filters.courtType,
+      });
+    }
+
+    if (filters.court && filters.court !== 'all') {
+      query = query.andWhere('court.court_id = :court', {
+        court: filters.court,
+      });
+    }
+
+    query = query
       .groupBy('user.user_id')
       .orderBy('total_revenue', 'DESC')
       .limit(limit);
 
-    query = this.applyFilters(query, filters);
     const results = await query.getRawMany<TopCustomerRaw>();
 
     return results.map((row) => ({
@@ -391,25 +493,51 @@ export class ReportsService {
   }
 
   async getCourtPerformance(filters: ReportFilters) {
-    let query = this.bookingRepository
-      .createQueryBuilder('booking')
+    let query = this.paymentRepository
+      .createQueryBuilder('payment')
       .select('court.court_id', 'court_id')
       .addSelect('court.name', 'court_name')
       .addSelect('courtType.name', 'court_type')
       .addSelect('courtVenue.name', 'venue_name')
-      .addSelect('COUNT(booking.booking_id)', 'total_bookings')
-      .addSelect('SUM(booking.total_amount)', 'total_revenue')
-      .addSelect('AVG(booking.total_amount)', 'avg_booking_value')
+      .addSelect('COUNT(DISTINCT booking.booking_id)', 'total_bookings')
+      .addSelect('COALESCE(SUM(payment.amount), 0)', 'total_revenue')
+      .addSelect('COALESCE(AVG(payment.amount), 0)', 'avg_booking_value')
+      .leftJoin('payment.booking', 'booking')
       .leftJoin('booking.court', 'court')
       .leftJoin('court.venue', 'courtVenue')
       .leftJoin('court.courtType', 'courtType')
-      .where('booking.status IN (:...statuses)', {
+      .where('payment.status = :paymentStatus', { paymentStatus: 'completed' })
+      .andWhere('booking.status IN (:...statuses)', {
         statuses: ['confirmed', 'completed'],
-      })
-      .groupBy('court.court_id')
-      .orderBy('total_revenue', 'DESC');
+      });
 
-    query = this.applyFilters(query, filters);
+    // Apply filters
+    if (filters.startDate) {
+      query = query.andWhere('DATE(booking.booking_date) >= :startDate', {
+        startDate: filters.startDate,
+      });
+    }
+
+    if (filters.endDate) {
+      query = query.andWhere('DATE(booking.booking_date) <= :endDate', {
+        endDate: filters.endDate,
+      });
+    }
+
+    if (filters.courtType && filters.courtType !== 'all') {
+      query = query.andWhere('courtType.type_id = :courtType', {
+        courtType: filters.courtType,
+      });
+    }
+
+    if (filters.court && filters.court !== 'all') {
+      query = query.andWhere('court.court_id = :court', {
+        court: filters.court,
+      });
+    }
+
+    query = query.groupBy('court.court_id').orderBy('total_revenue', 'DESC');
+
     const results = await query.getRawMany<CourtPerformanceRaw>();
 
     const { startDate, endDate } = filters;
@@ -435,18 +563,47 @@ export class ReportsService {
   }
 
   async getPaymentMethodStats(filters: ReportFilters) {
-    let query = this.bookingRepository
-      .createQueryBuilder('booking')
-      .select('booking.payment_method', 'payment_method')
-      .addSelect('SUM(booking.total_amount)', 'total_amount')
-      .addSelect('COUNT(booking.booking_id)', 'transaction_count')
+    let query = this.paymentRepository
+      .createQueryBuilder('payment')
+      .select('payment.payment_method', 'payment_method')
+      .addSelect('COALESCE(SUM(payment.amount), 0)', 'total_amount')
+      .addSelect('COUNT(payment.payment_id)', 'transaction_count')
+      .leftJoin('payment.booking', 'booking')
       .leftJoin('booking.court', 'court')
-      .where('booking.status IN (:...statuses)', {
+      .leftJoin('court.venue', 'courtVenue')
+      .leftJoin('court.courtType', 'courtTypeEntity')
+      .where('payment.status = :paymentStatus', { paymentStatus: 'completed' })
+      .andWhere('booking.status IN (:...statuses)', {
         statuses: ['confirmed', 'completed'],
-      })
-      .groupBy('booking.payment_method');
+      });
 
-    query = this.applyFilters(query, filters);
+    // Apply filters
+    if (filters.startDate) {
+      query = query.andWhere('DATE(booking.booking_date) >= :startDate', {
+        startDate: filters.startDate,
+      });
+    }
+
+    if (filters.endDate) {
+      query = query.andWhere('DATE(booking.booking_date) <= :endDate', {
+        endDate: filters.endDate,
+      });
+    }
+
+    if (filters.courtType && filters.courtType !== 'all') {
+      query = query.andWhere('courtTypeEntity.type_id = :courtType', {
+        courtType: filters.courtType,
+      });
+    }
+
+    if (filters.court && filters.court !== 'all') {
+      query = query.andWhere('court.court_id = :court', {
+        court: filters.court,
+      });
+    }
+
+    query = query.groupBy('payment.payment_method');
+
     const results = await query.getRawMany<PaymentMethodStatsRaw>();
     const totalAmount = results.reduce(
       (sum, row) => sum + Number(row.total_amount),
@@ -463,19 +620,47 @@ export class ReportsService {
   }
 
   async getHourlyStats(filters: ReportFilters) {
-    let query = this.bookingRepository
-      .createQueryBuilder('booking')
+    let query = this.paymentRepository
+      .createQueryBuilder('payment')
       .select('HOUR(booking.start_time)', 'hour')
-      .addSelect('COUNT(booking.booking_id)', 'bookings_count')
-      .addSelect('SUM(booking.total_amount)', 'revenue')
+      .addSelect('COUNT(DISTINCT booking.booking_id)', 'bookings_count')
+      .addSelect('COALESCE(SUM(payment.amount), 0)', 'revenue')
+      .leftJoin('payment.booking', 'booking')
       .leftJoin('booking.court', 'court')
-      .where('booking.status IN (:...statuses)', {
+      .leftJoin('court.venue', 'courtVenue')
+      .leftJoin('court.courtType', 'courtTypeEntity')
+      .where('payment.status = :paymentStatus', { paymentStatus: 'completed' })
+      .andWhere('booking.status IN (:...statuses)', {
         statuses: ['confirmed', 'completed'],
-      })
-      .groupBy('hour')
-      .orderBy('hour', 'ASC');
+      });
 
-    query = this.applyFilters(query, filters);
+    // Apply filters
+    if (filters.startDate) {
+      query = query.andWhere('DATE(booking.booking_date) >= :startDate', {
+        startDate: filters.startDate,
+      });
+    }
+
+    if (filters.endDate) {
+      query = query.andWhere('DATE(booking.booking_date) <= :endDate', {
+        endDate: filters.endDate,
+      });
+    }
+
+    if (filters.courtType && filters.courtType !== 'all') {
+      query = query.andWhere('courtTypeEntity.type_id = :courtType', {
+        courtType: filters.courtType,
+      });
+    }
+
+    if (filters.court && filters.court !== 'all') {
+      query = query.andWhere('court.court_id = :court', {
+        court: filters.court,
+      });
+    }
+
+    query = query.groupBy('hour').orderBy('hour', 'ASC');
+
     const results = await query.getRawMany<HourlyAnalyticsRaw>();
 
     return results.map((row) => ({
