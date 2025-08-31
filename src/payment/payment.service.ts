@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -22,6 +24,7 @@ export class PaymentService {
     @InjectRepository(Payment)
     private paymentRepository: Repository<Payment>,
     private vnpayService: VnpayService,
+    @Inject(forwardRef(() => BookingService))
     private bookingService: BookingService,
     private notificationService: NotificationService,
   ) {}
@@ -220,6 +223,36 @@ export class PaymentService {
 
     if (status === PaymentStatus.COMPLETED) {
       payment.paid_at = new Date();
+
+      // ✅ Đồng bộ cập nhật booking payment_status khi payment completed
+      if (payment.booking_id) {
+        try {
+          await this.bookingService.updatePaymentStatus(
+            payment.booking_id,
+            'paid',
+          );
+          console.log(
+            `✅ Synced booking ${payment.booking_id} payment status to paid`,
+          );
+        } catch (error) {
+          console.error('❌ Error syncing booking payment status:', error);
+        }
+      }
+    } else if (status === PaymentStatus.FAILED) {
+      // ✅ Đồng bộ cập nhật booking payment_status khi payment failed
+      if (payment.booking_id) {
+        try {
+          await this.bookingService.updatePaymentStatus(
+            payment.booking_id,
+            'partial',
+          );
+          console.log(
+            `✅ Synced booking ${payment.booking_id} payment status to partial`,
+          );
+        } catch (error) {
+          console.error('❌ Error syncing booking payment status:', error);
+        }
+      }
     }
 
     return this.paymentRepository.save(payment);
@@ -244,6 +277,28 @@ export class PaymentService {
       // Nếu status thành completed thì tự động set paid_at
       if (updateData.status === PaymentStatus.COMPLETED && !payment.paid_at) {
         payment.paid_at = new Date();
+      }
+
+      // ✅ Đồng bộ cập nhật booking payment_status
+      if (payment.booking_id) {
+        try {
+          const bookingPaymentStatus =
+            updateData.status === PaymentStatus.COMPLETED
+              ? 'paid'
+              : updateData.status === PaymentStatus.FAILED
+                ? 'partial'
+                : 'unpaid';
+
+          await this.bookingService.updatePaymentStatus(
+            payment.booking_id,
+            bookingPaymentStatus as 'unpaid' | 'partial' | 'paid' | 'refunded',
+          );
+          console.log(
+            `✅ Synced booking ${payment.booking_id} payment status to ${bookingPaymentStatus}`,
+          );
+        } catch (error) {
+          console.error('❌ Error syncing booking payment status:', error);
+        }
       }
     }
 

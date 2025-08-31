@@ -3,6 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, FindManyOptions, FindOptionsWhere } from 'typeorm';
@@ -17,6 +19,8 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { BookingStatsDto } from './dto/stats.dto';
 import { NotificationService } from '../notification/notification.service';
+import { PaymentService } from '../payment/payment.service';
+import { PaymentMethod } from '../payment/entities/payment.entity';
 
 @Injectable()
 export class BookingService {
@@ -28,6 +32,8 @@ export class BookingService {
     @InjectRepository(CourtMapping)
     private courtMappingRepository: Repository<CourtMapping>,
     private readonly notificationService: NotificationService,
+    @Inject(forwardRef(() => PaymentService))
+    private readonly paymentService: PaymentService,
   ) {}
 
   // ✅ Cập nhật method create để user_id bắt buộc
@@ -131,6 +137,31 @@ export class BookingService {
         payment_method: paymentMethod,
         payment_status: savedBooking.payment_status,
       });
+
+      // ✅ Tự động tạo payment record cho thanh toán tiền mặt
+      if (paymentMethod === 'cash') {
+        try {
+          const paymentData = {
+            user_id: userId,
+            booking_id: savedBooking.booking_id,
+            amount: totalAmount,
+            payment_method: PaymentMethod.CASH,
+            description: `Thanh toán đặt sân #${savedBooking.booking_code}`,
+          };
+
+          await this.paymentService.create(paymentData);
+
+          console.log(
+            '✅ Created payment record for cash payment with pending status',
+          );
+        } catch (paymentError) {
+          console.error(
+            '❌ Error creating payment record for cash:',
+            paymentError,
+          );
+          // Không throw error để không ảnh hưởng đến booking creation
+        }
+      }
 
       // ✅ Chỉ tạo thông báo cho cash payment, VNPay sẽ tạo sau khi thanh toán thành công
       if (paymentMethod === 'cash') {
@@ -384,6 +415,32 @@ export class BookingService {
         where: { status: BookingStatus.CANCELLED },
       });
 
+      // ✅ Tính todayBookings - số booking có ngày chơi là hôm nay (dựa trên field date)
+      const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+      const todayBookings = await this.bookingRepository.count({
+        where: {
+          date: today,
+          status: In([BookingStatus.CONFIRMED, BookingStatus.PENDING]),
+        },
+      });
+
+      // ✅ Tính todayBookingsCreated - số booking được tạo hôm nay (dựa trên created_at)
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const todayBookingsCreated = await this.bookingRepository
+        .createQueryBuilder('booking')
+        .where(
+          'booking.created_at >= :startOfDay AND booking.created_at <= :endOfDay',
+          {
+            startOfDay,
+            endOfDay,
+          },
+        )
+        .getCount();
+
       // Thêm code để lấy số lượng booking theo venue
       const venueBookingsQuery = await this.bookingRepository
         .createQueryBuilder('booking')
@@ -410,6 +467,8 @@ export class BookingService {
 
       return {
         totalBookings,
+        todayBookings,
+        todayBookingsCreated,
         confirmedBookings,
         pendingBookings,
         completedBookings,
@@ -421,6 +480,8 @@ export class BookingService {
       // Trả về giá trị mặc định đầy đủ các trường khi có lỗi
       return {
         totalBookings: 0,
+        todayBookings: 0,
+        todayBookingsCreated: 0,
         confirmedBookings: 0,
         pendingBookings: 0,
         completedBookings: 0,
@@ -458,7 +519,7 @@ export class BookingService {
 
   async updatePaymentStatus(
     bookingId: number,
-    paymentStatus: 'pending' | 'paid' | 'refunded',
+    paymentStatus: 'unpaid' | 'partial' | 'paid' | 'refunded',
   ): Promise<Booking> {
     const booking = await this.findOne(bookingId);
     booking.payment_status = paymentStatus as PaymentStatus;
