@@ -191,7 +191,7 @@ export class PaymentService {
 
   async findAll(): Promise<Payment[]> {
     return this.paymentRepository.find({
-      relations: ['user', 'booking'],
+      relations: ['user', 'booking', 'booking.court'],
       order: { created_at: 'DESC' },
     });
   }
@@ -199,7 +199,7 @@ export class PaymentService {
   async findOne(id: number): Promise<Payment> {
     const payment = await this.paymentRepository.findOne({
       where: { payment_id: id },
-      relations: ['user', 'booking'],
+      relations: ['user', 'booking', 'booking.court'],
     });
 
     if (!payment) {
@@ -212,7 +212,7 @@ export class PaymentService {
   async findByUser(userId: number): Promise<Payment[]> {
     return this.paymentRepository.find({
       where: { user_id: userId },
-      relations: ['booking'],
+      relations: ['booking', 'booking.court'],
       order: { created_at: 'DESC' },
     });
   }
