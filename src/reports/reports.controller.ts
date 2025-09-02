@@ -1,107 +1,129 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  UseGuards,
+  BadRequestException,
+  ParseIntPipe,
+} from '@nestjs/common';
+import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { ReportsService } from 'src/reports/reports.service';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('reports')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin', 'manager')
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
-  // Thêm endpoint để lấy danh sách courts cho filter
-  @Get('filter-options')
-  async getFilterOptions() {
-    return this.reportsService.getFilterOptions();
+  @Get('revenue')
+  async getRevenueReport(
+    @Query('period') period?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    try {
+      return await this.reportsService.getRevenueReport(
+        period,
+        startDate,
+        endDate,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Server error';
+      throw new BadRequestException(message);
+    }
   }
 
-  @Get('stats')
-  async getOverviewStats(
-    @Query('start_date') startDate?: string,
-    @Query('end_date') endDate?: string,
-    @Query('court_type') courtType?: string,
-    @Query('court') court?: string,
+  @Get('bookings')
+  async getBookingReport(
+    @Query('period') period?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
-    return this.reportsService.getOverviewStats({
-      startDate,
-      endDate,
-      courtType,
-      court,
-    });
+    try {
+      return await this.reportsService.getBookingReport(
+        period,
+        startDate,
+        endDate,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Server error';
+      throw new BadRequestException(message);
+    }
   }
 
-  @Get('revenue-timeline')
-  async getRevenueTimeline(
-    @Query('start_date') startDate?: string,
-    @Query('end_date') endDate?: string,
-    @Query('court_type') courtType?: string,
-    @Query('court') court?: string,
+  @Get('customers')
+  async getCustomerReport(
+    @Query('period') period?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
-    return this.reportsService.getRevenueTimeline({
-      startDate,
-      endDate,
-      courtType,
-      court,
-    });
+    try {
+      return await this.reportsService.getCustomerReport(
+        period,
+        startDate,
+        endDate,
+        limit,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Server error';
+      throw new BadRequestException(message);
+    }
   }
 
-  @Get('top-customers')
-  async getTopCustomers(
-    @Query('start_date') startDate?: string,
-    @Query('end_date') endDate?: string,
-    @Query('court_type') courtType?: string,
-    @Query('court') court?: string,
-    @Query('limit') limit = 10,
+  @Get('courts')
+  async getCourtReport(
+    @Query('period') period?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
-    return this.reportsService.getTopCustomers({
-      startDate,
-      endDate,
-      courtType,
-      court,
-      limit: Number(limit),
-    });
+    try {
+      return await this.reportsService.getCourtReport(
+        period,
+        startDate,
+        endDate,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Server error';
+      throw new BadRequestException(message);
+    }
   }
 
-  @Get('court-performance')
-  async getCourtPerformance(
-    @Query('start_date') startDate?: string,
-    @Query('end_date') endDate?: string,
-    @Query('court_type') courtType?: string,
-    @Query('court') court?: string,
+  @Get('customer/:id/history')
+  async getCustomerHistory(
+    @Query('id', ParseIntPipe) customerId: number,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
-    return this.reportsService.getCourtPerformance({
-      startDate,
-      endDate,
-      courtType,
-      court,
-    });
+    try {
+      return await this.reportsService.getCustomerHistory(
+        customerId,
+        startDate,
+        endDate,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Server error';
+      throw new BadRequestException(message);
+    }
   }
 
-  @Get('payment-methods')
-  async getPaymentMethodStats(
-    @Query('start_date') startDate?: string,
-    @Query('end_date') endDate?: string,
-    @Query('court_type') courtType?: string,
-    @Query('court') court?: string,
+  @Get('dashboard')
+  async getDashboardStats(
+    @Query('period') period?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
-    return this.reportsService.getPaymentMethodStats({
-      startDate,
-      endDate,
-      courtType,
-      court,
-    });
-  }
-
-  @Get('hourly-stats')
-  async getHourlyStats(
-    @Query('start_date') startDate?: string,
-    @Query('end_date') endDate?: string,
-    @Query('court_type') courtType?: string,
-    @Query('court') court?: string,
-  ) {
-    return this.reportsService.getHourlyStats({
-      startDate,
-      endDate,
-      courtType,
-      court,
-    });
+    try {
+      return await this.reportsService.getDashboardStats(
+        period,
+        startDate,
+        endDate,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Server error';
+      throw new BadRequestException(message);
+    }
   }
 }
