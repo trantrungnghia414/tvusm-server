@@ -187,13 +187,37 @@ export class ReportsService {
     let end: Date = new Date(now);
 
     if (startDate && endDate) {
-      start = new Date(startDate);
-      // Set start time to beginning of day
+      // Xử lý timezone để tránh lệch ngày
+      const startParts = startDate.split('-');
+      const endParts = endDate.split('-');
+
+      start = new Date(
+        parseInt(startParts[0]),
+        parseInt(startParts[1]) - 1,
+        parseInt(startParts[2]),
+      );
       start.setHours(0, 0, 0, 0);
 
-      end = new Date(endDate);
-      // Set end time to end of day to include all bookings on that date
+      end = new Date(
+        parseInt(endParts[0]),
+        parseInt(endParts[1]) - 1,
+        parseInt(endParts[2]),
+      );
       end.setHours(23, 59, 59, 999);
+
+      console.log('🔍 Date Range Processing:');
+      console.log(
+        'Input startDate:',
+        startDate,
+        '→ Processed:',
+        start.toLocaleDateString('vi-VN'),
+      );
+      console.log(
+        'Input endDate:',
+        endDate,
+        '→ Processed:',
+        end.toLocaleDateString('vi-VN'),
+      );
     } else if (period) {
       switch (period) {
         case 'week':
@@ -633,15 +657,34 @@ export class ReportsService {
 
   // Helper methods
   private groupByDay(payments: Payment[], start: Date, end: Date) {
+    console.log(
+      '📊 GroupByDay Range:',
+      start.toLocaleDateString('vi-VN'),
+      'to',
+      end.toLocaleDateString('vi-VN'),
+    );
+
     const days: Array<{ date: string; revenue: number; bookingCount: number }> =
       [];
-    const current = new Date(start);
 
-    while (current <= end) {
-      const dateStr = current.toISOString().split('T')[0];
+    // Tạo bản copy và sử dụng milliseconds để tránh lỗi timezone
+    const current = new Date(start.getTime());
+    const endTime = end.getTime();
+
+    while (current.getTime() <= endTime) {
+      // Lấy ngày theo local timezone
+      const year = current.getFullYear();
+      const month = String(current.getMonth() + 1).padStart(2, '0');
+      const day = String(current.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
       const dayPayments = payments.filter((p) => {
         const createdAt = new Date(p.created_at);
-        return createdAt.toISOString().split('T')[0] === dateStr;
+        const paymentYear = createdAt.getFullYear();
+        const paymentMonth = String(createdAt.getMonth() + 1).padStart(2, '0');
+        const paymentDay = String(createdAt.getDate()).padStart(2, '0');
+        const paymentDateStr = `${paymentYear}-${paymentMonth}-${paymentDay}`;
+        return paymentDateStr === dateStr;
       });
 
       days.push({
@@ -653,9 +696,18 @@ export class ReportsService {
         bookingCount: dayPayments.length,
       });
 
-      current.setDate(current.getDate() + 1);
+      // Tăng ngày một cách an toàn
+      current.setTime(current.getTime() + 24 * 60 * 60 * 1000);
     }
 
+    console.log(
+      '📊 Generated chart data:',
+      days.length,
+      'days from',
+      days[0]?.date,
+      'to',
+      days[days.length - 1]?.date,
+    );
     return days;
   }
 
@@ -764,14 +816,33 @@ export class ReportsService {
   }
 
   private groupBookingsByDay(bookings: Booking[], start: Date, end: Date) {
-    const days: Array<{ date: string; count: number; revenue: number }> = [];
-    const current = new Date(start);
+    console.log(
+      '📊 GroupBookingsByDay Range:',
+      start.toLocaleDateString('vi-VN'),
+      'to',
+      end.toLocaleDateString('vi-VN'),
+    );
 
-    while (current <= end) {
-      const dateStr = current.toISOString().split('T')[0];
+    const days: Array<{ date: string; count: number; revenue: number }> = [];
+
+    // Tạo bản copy và sử dụng milliseconds để tránh lỗi timezone
+    const current = new Date(start.getTime());
+    const endTime = end.getTime();
+
+    while (current.getTime() <= endTime) {
+      // Lấy ngày theo local timezone
+      const year = current.getFullYear();
+      const month = String(current.getMonth() + 1).padStart(2, '0');
+      const day = String(current.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
       const dayBookings = bookings.filter((b) => {
         const createdAt = new Date(b.created_at);
-        return createdAt.toISOString().split('T')[0] === dateStr;
+        const bookingYear = createdAt.getFullYear();
+        const bookingMonth = String(createdAt.getMonth() + 1).padStart(2, '0');
+        const bookingDay = String(createdAt.getDate()).padStart(2, '0');
+        const bookingDateStr = `${bookingYear}-${bookingMonth}-${bookingDay}`;
+        return bookingDateStr === dateStr;
       });
 
       days.push({
@@ -780,9 +851,18 @@ export class ReportsService {
         revenue: dayBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0),
       });
 
-      current.setDate(current.getDate() + 1);
+      // Tăng ngày một cách an toàn
+      current.setTime(current.getTime() + 24 * 60 * 60 * 1000);
     }
 
+    console.log(
+      '📊 Generated booking chart data:',
+      days.length,
+      'days from',
+      days[0]?.date,
+      'to',
+      days[days.length - 1]?.date,
+    );
     return days;
   }
 
