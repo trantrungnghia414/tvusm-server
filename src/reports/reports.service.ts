@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { Booking, BookingStatus } from '../booking/entities/booking.entity';
-import { Payment } from '../payment/entities/payment.entity';
+import { Payment, PaymentStatus } from '../payment/entities/payment.entity';
 import { User } from '../user/entities/user.entity';
 import { Court } from '../court/entities/court.entity';
 
@@ -177,18 +177,23 @@ export class ReportsService {
     private courtRepository: Repository<Court>,
   ) {}
 
-  private getDateRange(
+  private async getDateRange(
     period?: string,
     startDate?: string,
     endDate?: string,
-  ): { start: Date; end: Date } {
+  ): Promise<{ start: Date; end: Date }> {
     const now = new Date();
     let start: Date;
     let end: Date = new Date(now);
 
     if (startDate && endDate) {
       start = new Date(startDate);
+      // Set start time to beginning of day
+      start.setHours(0, 0, 0, 0);
+
       end = new Date(endDate);
+      // Set end time to end of day to include all bookings on that date
+      end.setHours(23, 59, 59, 999);
     } else if (period) {
       switch (period) {
         case 'week':
@@ -208,9 +213,22 @@ export class ReportsService {
           start.setFullYear(now.getFullYear() - 1);
           break;
         case 'all':
-        default:
-          start = new Date('2020-01-01');
+        default: {
+          // Find the first booking date
+          const firstBooking = await this.bookingRepository
+            .createQueryBuilder('booking')
+            .orderBy('booking.created_at', 'ASC')
+            .getOne();
+
+          if (firstBooking) {
+            start = new Date(firstBooking.created_at);
+            start.setHours(0, 0, 0, 0);
+          } else {
+            // Fallback if no bookings exist
+            start = new Date('2020-01-01');
+          }
           break;
+        }
       }
     } else {
       // Default to current month
@@ -225,26 +243,63 @@ export class ReportsService {
     startDate?: string,
     endDate?: string,
   ): Promise<RevenueReportData> {
-    const { start, end } = this.getDateRange(period, startDate, endDate);
+    const { start, end } = await this.getDateRange(period, startDate, endDate);
 
-    // Get completed payments within date range
-    const payments = await this.paymentRepository
+    console.log(
+      'Getting revenue for period:',
+      period,
+      'between',
+      start.toISOString(),
+      'and',
+      end.toISOString(),
+    );
+
+    // First, let's check what payments exist
+    const allPayments = await this.paymentRepository.find({
+      take: 10,
+      order: { created_at: 'DESC' },
+    });
+
+    console.log('Sample payments:', allPayments.length);
+    if (allPayments.length > 0) {
+      console.log('First payment:', {
+        id: allPayments[0].payment_id,
+        status: allPayments[0].status,
+        amount: allPayments[0].amount,
+        paid_at: allPayments[0].paid_at,
+      });
+    }
+
+    // Try to get payments with different status values
+    const completedPayments = await this.paymentRepository
       .createQueryBuilder('payment')
-      .leftJoinAndSelect('payment.booking', 'booking')
-      .where('payment.status = :status', { status: 'completed' })
-      .andWhere('payment.paid_at BETWEEN :start AND :end', { start, end })
+      .where('payment.status = :status', { status: PaymentStatus.COMPLETED })
       .getMany();
 
-    const totalRevenue = payments.reduce(
-      (sum, payment) => sum + payment.amount,
+    console.log('Total completed payments:', completedPayments.length);
+
+    // Get payments within date range - sử dụng created_at thay vì paid_at
+    const paymentsInRange = await this.paymentRepository
+      .createQueryBuilder('payment')
+      .leftJoinAndSelect('payment.booking', 'booking')
+      .where('payment.created_at BETWEEN :start AND :end', { start, end })
+      .andWhere('payment.status = :status', { status: PaymentStatus.COMPLETED })
+      .getMany();
+
+    console.log('Completed payments in date range:', paymentsInRange.length);
+
+    const totalRevenue = paymentsInRange.reduce(
+      (sum, payment) => sum + parseFloat(payment.amount.toString()),
       0,
     );
 
+    console.log('Total revenue calculated:', totalRevenue);
+
     // Revenue by day
-    const revenueByDay = this.groupByDay(payments, start, end);
+    const revenueByDay = this.groupByDay(paymentsInRange, start, end);
 
     // Revenue by payment method
-    const revenueByPaymentMethod = this.groupByPaymentMethod(payments);
+    const revenueByPaymentMethod = this.groupByPaymentMethod(paymentsInRange);
 
     // Calculate growth rate (compared to previous period)
     const growthRate = await this.calculateGrowthRate(start, end, totalRevenue);
@@ -263,7 +318,7 @@ export class ReportsService {
     startDate?: string,
     endDate?: string,
   ): Promise<BookingReportData> {
-    const { start, end } = this.getDateRange(period, startDate, endDate);
+    const { start, end } = await this.getDateRange(period, startDate, endDate);
 
     const bookings = await this.bookingRepository
       .createQueryBuilder('booking')
@@ -306,12 +361,13 @@ export class ReportsService {
     endDate?: string,
     limit: number = 10,
   ): Promise<CustomerReportData> {
-    const { start, end } = this.getDateRange(period, startDate, endDate);
+    const { start, end } = await this.getDateRange(period, startDate, endDate);
 
     // Get customers with bookings in period
     const customersWithBookings = await this.bookingRepository
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.user', 'user')
+      .leftJoinAndSelect('booking.payment', 'payment')
       .where('booking.created_at BETWEEN :start AND :end', { start, end })
       .getMany();
 
@@ -343,7 +399,7 @@ export class ReportsService {
     startDate?: string,
     endDate?: string,
   ): Promise<CourtReportData> {
-    const { start, end } = this.getDateRange(period, startDate, endDate);
+    const { start, end } = await this.getDateRange(period, startDate, endDate);
 
     const courts = await this.courtRepository
       .createQueryBuilder('court')
@@ -356,6 +412,7 @@ export class ReportsService {
       courts.map(async (court) => {
         const bookings = await this.bookingRepository
           .createQueryBuilder('booking')
+          .leftJoinAndSelect('booking.payment', 'payment')
           .where('booking.court_id = :courtId', { courtId: court.court_id })
           .andWhere('booking.created_at BETWEEN :start AND :end', {
             start,
@@ -367,10 +424,16 @@ export class ReportsService {
           .getMany();
 
         const bookingCount = bookings.length;
-        const revenue = bookings.reduce(
-          (sum, booking) => sum + (booking.total_amount || 0),
-          0,
-        );
+        // Only count revenue from completed payments
+        const revenue = bookings.reduce((sum, booking) => {
+          if (
+            booking.payment &&
+            booking.payment.status === PaymentStatus.COMPLETED
+          ) {
+            return sum + parseFloat(booking.payment.amount.toString());
+          }
+          return sum;
+        }, 0);
 
         // Calculate utilization rate (simplified)
         const totalHoursInPeriod = this.calculateTotalHours(start, end);
@@ -451,15 +514,20 @@ export class ReportsService {
 
     const bookings = await this.bookingRepository.find({
       where: { user_id: customerId, ...dateWhere },
-      relations: ['court'],
+      relations: ['court', 'payment'],
       order: { created_at: 'DESC' },
     });
 
     const totalBookings = bookings.length;
-    const totalSpent = bookings.reduce(
-      (sum, booking) => sum + (booking.total_amount || 0),
-      0,
-    );
+    const totalSpent = bookings.reduce((sum, booking) => {
+      if (
+        booking.payment &&
+        booking.payment.status === PaymentStatus.COMPLETED
+      ) {
+        return sum + parseFloat(booking.payment.amount.toString());
+      }
+      return sum;
+    }, 0);
 
     const bookingHistory = bookings.map((booking) => ({
       booking_id: booking.booking_id,
@@ -468,9 +536,12 @@ export class ReportsService {
       date: booking.date,
       start_time: booking.start_time,
       end_time: booking.end_time,
-      total_amount: booking.total_amount || 0,
+      total_amount:
+        booking.payment && booking.payment.status === PaymentStatus.COMPLETED
+          ? parseFloat(booking.payment.amount.toString())
+          : 0,
       status: booking.status,
-      payment_status: booking.payment_status,
+      payment_status: booking.payment?.status || 'unpaid',
       created_at: booking.created_at.toISOString(),
     }));
 
@@ -510,6 +581,14 @@ export class ReportsService {
     );
     const courtReport = await this.getCourtReport(period, startDate, endDate);
 
+    // Calculate bookings growth rate
+    const { start, end } = await this.getDateRange(period, startDate, endDate);
+    const bookingsGrowthRate = await this.calculateBookingsGrowthRate(
+      start,
+      end,
+      bookingReport.totalBookings,
+    );
+
     const avgUtilization =
       courtReport.courtUsage.reduce(
         (sum, court) => sum + court.utilizationRate,
@@ -525,7 +604,7 @@ export class ReportsService {
       },
       bookings: {
         total: bookingReport.totalBookings,
-        growth: 0, // Calculate separately if needed
+        growth: bookingsGrowthRate,
         avgValue: bookingReport.averageBookingValue,
       },
       customers: {
@@ -561,13 +640,16 @@ export class ReportsService {
     while (current <= end) {
       const dateStr = current.toISOString().split('T')[0];
       const dayPayments = payments.filter((p) => {
-        const paidAt = new Date(p.paid_at);
-        return paidAt.toISOString().split('T')[0] === dateStr;
+        const createdAt = new Date(p.created_at);
+        return createdAt.toISOString().split('T')[0] === dateStr;
       });
 
       days.push({
         date: dateStr,
-        revenue: dayPayments.reduce((sum, p) => sum + p.amount, 0),
+        revenue: dayPayments.reduce(
+          (sum, p) => sum + parseFloat(p.amount.toString()),
+          0,
+        ),
         bookingCount: dayPayments.length,
       });
 
@@ -586,7 +668,7 @@ export class ReportsService {
         methods.set(method, { revenue: 0, count: 0 });
       }
       const current = methods.get(method)!;
-      current.revenue += payment.amount;
+      current.revenue += parseFloat(payment.amount.toString());
       current.count += 1;
     });
 
@@ -609,8 +691,8 @@ export class ReportsService {
     const previousRevenueResult = (await this.paymentRepository
       .createQueryBuilder('payment')
       .select('SUM(payment.amount)', 'total')
-      .where('payment.status = :status', { status: 'completed' })
-      .andWhere('payment.paid_at BETWEEN :start AND :end', {
+      .where('payment.status = :status', { status: PaymentStatus.COMPLETED })
+      .andWhere('payment.created_at BETWEEN :start AND :end', {
         start: previousStart,
         end: previousEnd,
       })
@@ -618,9 +700,51 @@ export class ReportsService {
 
     const previousRevenue = parseFloat(previousRevenueResult?.total || '0');
 
-    return previousRevenue > 0
-      ? ((currentRevenue - previousRevenue) / previousRevenue) * 100
-      : 0;
+    // Nếu kỳ trước = 0 và kỳ hiện tại > 0 thì growth = +100%
+    if (previousRevenue === 0 && currentRevenue > 0) {
+      return 100;
+    }
+
+    // Nếu kỳ trước = 0 và kỳ hiện tại = 0 thì growth = 0%
+    if (previousRevenue === 0 && currentRevenue === 0) {
+      return 0;
+    }
+
+    // Tính growth bình thường
+    return ((currentRevenue - previousRevenue) / previousRevenue) * 100;
+  }
+
+  private async calculateBookingsGrowthRate(
+    start: Date,
+    end: Date,
+    currentBookings: number,
+  ): Promise<number> {
+    const periodLength = end.getTime() - start.getTime();
+    const previousStart = new Date(start.getTime() - periodLength);
+    const previousEnd = new Date(start);
+
+    const previousBookingsCount = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .where('booking.created_at BETWEEN :start AND :end', {
+        start: previousStart,
+        end: previousEnd,
+      })
+      .getCount();
+
+    // Nếu kỳ trước = 0 và kỳ hiện tại > 0 thì growth = +100%
+    if (previousBookingsCount === 0 && currentBookings > 0) {
+      return 100;
+    }
+
+    // Nếu kỳ trước = 0 và kỳ hiện tại = 0 thì growth = 0%
+    if (previousBookingsCount === 0 && currentBookings === 0) {
+      return 0;
+    }
+
+    // Tính growth bình thường
+    return (
+      ((currentBookings - previousBookingsCount) / previousBookingsCount) * 100
+    );
   }
 
   private groupBookingsByStatus(bookings: Booking[]) {
@@ -694,7 +818,15 @@ export class ReportsService {
 
       const customer = customerMap.get(userId)!;
       customer.bookingCount += 1;
-      customer.totalSpent += booking.total_amount || 0;
+
+      // Only count revenue from completed payments
+      if (
+        booking.payment &&
+        booking.payment.status === PaymentStatus.COMPLETED
+      ) {
+        customer.totalSpent += parseFloat(booking.payment.amount.toString());
+      }
+
       if (booking.created_at > customer.lastBooking) {
         customer.lastBooking = booking.created_at;
       }

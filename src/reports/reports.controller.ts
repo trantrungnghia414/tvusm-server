@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Query,
+  Param,
   UseGuards,
   BadRequestException,
   ParseIntPipe,
@@ -93,7 +94,7 @@ export class ReportsController {
 
   @Get('customer/:id/history')
   async getCustomerHistory(
-    @Query('id', ParseIntPipe) customerId: number,
+    @Param('id', ParseIntPipe) customerId: number,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
