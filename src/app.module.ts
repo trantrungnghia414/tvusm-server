@@ -49,6 +49,9 @@ import { PaymentModule } from 'src/payment/payment.module';
 import { EquipmentIssue } from './equipment-issues/entities/equipment-issue.entity';
 import { EquipmentIssuesModule } from './equipment-issues/equipment-issues.module';
 
+import { Maintenance } from './maintenance/entities/maintenance.entity';
+import { MaintenanceModule } from './maintenance/maintenance.module';
+
 import { ReportsModule } from './reports/reports.module';
 
 @Module({
@@ -77,6 +80,7 @@ import { ReportsModule } from './reports/reports.module';
         Notification,
         Payment,
         EquipmentIssue,
+        Maintenance,
       ],
       synchronize: false, // Chỉ nên để true trong môi trường phát triển
     }),
@@ -94,6 +98,7 @@ import { ReportsModule } from './reports/reports.module';
     NotificationModule,
     PaymentModule,
     EquipmentIssuesModule,
+    MaintenanceModule,
     ReportsModule,
     ConfigModule.forRoot({
       isGlobal: true, // Để biến môi trường có thể sử dụng ở bất kỳ đâu trong ứng dụng

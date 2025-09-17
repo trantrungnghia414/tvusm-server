@@ -25,7 +25,7 @@ export class MailService {
   // Sử dụng async/await để xử lý bất đồng bộ
   async sendVerificationCode(email: string, code: string) {
     await this.transporter.sendMail({
-      from: '"TVU Sports Center" <noreply@tvu.edu.vn>',
+      from: '"TVU Stadium Management" <noreply@tvu.edu.vn>',
       to: email,
       subject: 'Mã xác thực tài khoản của bạn',
       html: `
@@ -42,7 +42,7 @@ export class MailService {
   // Sử dụng async/await để xử lý bất đồng bộ
   async sendResetPasswordCode(email: string, code: string) {
     await this.transporter.sendMail({
-      from: '"TVU Sports Center" <noreply@tvu.edu.vn>',
+      from: '"TVU Stadium Management" <noreply@tvu.edu.vn>',
       to: email,
       subject: 'Mã đặt lại mật khẩu',
       html: `

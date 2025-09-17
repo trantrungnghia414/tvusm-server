@@ -47,6 +47,7 @@ interface CourtResponse {
   type_id: number;
   venue_name: string;
   type_name: string;
+  booking_count?: number; // Thêm field booking_count
   created_at: Date;
   updated_at: Date;
 }
@@ -160,7 +161,54 @@ export class CourtService {
         .orderBy('court.created_at', 'DESC')
         .getRawMany<CourtQueryResult>();
 
-      // ✅ Map với type safety
+      // ✅ Lấy booking count cho tất cả sân trong một query
+      interface BookingCountResult {
+        court_id: number;
+        booking_count: string;
+      }
+
+      const bookingCounts: unknown = await this.courtRepository.manager.query(`
+        SELECT 
+          court_id,
+          COUNT(*) as booking_count
+        FROM bookings 
+        WHERE status IN ('confirmed', 'completed')
+        GROUP BY court_id
+      `);
+
+      // ✅ Type guard cho booking count result
+      const isValidBookingCountResult = (
+        obj: unknown,
+      ): obj is BookingCountResult => {
+        if (typeof obj !== 'object' || obj === null) {
+          return false;
+        }
+        const candidate = obj as Record<string, unknown>;
+        return (
+          'court_id' in candidate &&
+          'booking_count' in candidate &&
+          (typeof candidate.court_id === 'number' ||
+            typeof candidate.court_id === 'string') &&
+          (typeof candidate.booking_count === 'number' ||
+            typeof candidate.booking_count === 'string')
+        );
+      };
+
+      // ✅ Tạo map để tra cứu booking count nhanh
+      const bookingCountMap = new Map<number, number>();
+      if (Array.isArray(bookingCounts)) {
+        for (const item of bookingCounts) {
+          if (isValidBookingCountResult(item)) {
+            const courtId = Number(item.court_id);
+            const count = Number(item.booking_count);
+            if (!isNaN(courtId) && !isNaN(count)) {
+              bookingCountMap.set(courtId, count);
+            }
+          }
+        }
+      }
+
+      // ✅ Map với type safety và thêm booking_count
       return courts.map(
         (court): CourtResponse => ({
           court_id: court.court_court_id,
@@ -177,6 +225,7 @@ export class CourtService {
           type_id: court.court_type_id,
           venue_name: court.venue_name,
           type_name: court.courtType_name,
+          booking_count: bookingCountMap.get(court.court_court_id) || 0, // Thêm booking count
           created_at: court.court_created_at,
           updated_at: court.court_updated_at,
         }),

@@ -332,6 +332,18 @@ export class PaymentService {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
 
+      // Lấy tháng trước
+      const startOfPreviousMonth = new Date(
+        today.getFullYear(),
+        today.getMonth() - 1,
+        1,
+      );
+      const endOfPreviousMonth = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        1,
+      );
+
       // Tính toán các thống kê cơ bản
       const totalPayments = allPayments.length;
       const totalAmount = allPayments.reduce(
@@ -391,6 +403,20 @@ export class PaymentService {
         0,
       );
 
+      // Doanh thu tháng trước
+      const previousMonthPayments = allPayments.filter((p) => {
+        const paymentDate = new Date(p.created_at);
+        return (
+          paymentDate >= startOfPreviousMonth &&
+          paymentDate < endOfPreviousMonth &&
+          p.status === PaymentStatus.COMPLETED
+        );
+      });
+      const previousMonthRevenue = previousMonthPayments.reduce(
+        (sum, p) => sum + Number(p.amount),
+        0,
+      );
+
       // Thống kê theo payment method
       const cashPayments = allPayments.filter(
         (p) => p.payment_method === PaymentMethod.CASH,
@@ -411,6 +437,7 @@ export class PaymentService {
         refundedAmount,
         todayRevenue,
         monthlyRevenue,
+        previousMonthRevenue,
         cashPayments,
         onlinePayments,
       };
@@ -428,6 +455,7 @@ export class PaymentService {
         refundedAmount: 0,
         todayRevenue: 0,
         monthlyRevenue: 0,
+        previousMonthRevenue: 0,
         cashPayments: 0,
         onlinePayments: 0,
       };

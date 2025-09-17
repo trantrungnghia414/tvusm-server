@@ -54,6 +54,7 @@ interface CourtResponse {
   type_id: number;
   venue_name: string;
   type_name: string;
+  booking_count?: number; // Thêm field booking_count
   created_at: Date;
   updated_at: Date;
 }
